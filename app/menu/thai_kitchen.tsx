@@ -80,13 +80,20 @@ const DishCard = ({
   dish,
   onPress,
   width,
+  cartQty = 0,
 }: {
   dish: any;
   onPress: () => void;
   width: number;
+  cartQty?: number;
 }) => {
   return (
     <TouchableOpacity style={[styles.card, { width }]} onPress={onPress}>
+      {cartQty > 0 && (
+        <View style={styles.qtyBadge}>
+          <Text style={styles.qtyBadgeText}>{cartQty}</Text>
+        </View>
+      )}
       <View style={styles.dishImageWrap}>
         {dish.ImageBase64 ? (
           <Image source={{ uri: dish.ImageBase64 }} style={styles.dishImg} />
@@ -447,20 +454,29 @@ export default function MenuScreen() {
                 keyExtractor={(item) => item.DishId}
                 numColumns={columns}
                 key={columns}
-                renderItem={({ item }) => (
-                  <DishCard
-                    dish={item}
-                    width={cardWidth}
-                    onPress={() => {
-                      const lineId = addToCartGlobal({
-                        id: item.DishId,
-                        name: item.Name,
-                        price: item.Price || 0,
-                      });
-                      openModifiers(item, lineId);
-                    }}
-                  />
-                )}
+                renderItem={({ item }) => {
+                  const ctxId = getContextId(orderContext);
+                  const currentCart = ctxId ? carts[ctxId] : [];
+                  const cartQty = currentCart?.reduce((acc, cartItem) => {
+                    return cartItem.id === item.DishId ? acc + cartItem.qty : acc;
+                  }, 0) || 0;
+
+                  return (
+                    <DishCard
+                      dish={item}
+                      width={cardWidth}
+                      cartQty={cartQty}
+                      onPress={() => {
+                        const lineId = addToCartGlobal({
+                          id: item.DishId,
+                          name: item.Name,
+                          price: item.Price || 0,
+                        });
+                        openModifiers(item, lineId);
+                      }}
+                    />
+                  );
+                }}
                 columnWrapperStyle={{ gap: gap, marginBottom: gap }}
                 contentContainerStyle={styles.listPadding}
                 showsVerticalScrollIndicator={false}
@@ -721,11 +737,32 @@ const styles = StyleSheet.create({
   gridContainer: { flex: 1 },
   listPadding: { paddingBottom: 80 },
   card: {
+    position: "relative",
     backgroundColor: "#fff",
     borderRadius: 20,
     padding: 10,
     alignItems: "center",
     ...Theme.shadowMd,
+  },
+  qtyBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    backgroundColor: Theme.primary,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+    borderWidth: 2,
+    borderColor: "#fff",
+    ...Theme.shadowSm,
+  },
+  qtyBadgeText: {
+    color: "#fff",
+    fontFamily: Fonts.black,
+    fontSize: 13,
   },
   dishImageWrap: {
     width: 70,
