@@ -36,28 +36,9 @@ export default function DiscountModal({
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [inputValue, setInputValue] = useState("");
   const [previewDiscount, setPreviewDiscount] = useState(0);
-  const [availableDiscounts, setAvailableDiscounts] = useState<any[]>([]);
-  const [loadingDiscounts, setLoadingDiscounts] = useState(false);
 
   const quickPercentages = [5, 10, 15, 20, 25, 50];
   const quickFixed = [5, 10, 20, 50, 75, 100];
-
-  useEffect(() => {
-    if (!visible) return;
-    const fetchDiscounts = async () => {
-      try {
-        setLoadingDiscounts(true);
-        const response = await fetch(`${API_URL}/api/discounts`);
-        const data = await response.json();
-        setAvailableDiscounts(Array.isArray(data) ? data : []);
-      } catch (err) {
-        setAvailableDiscounts([]);
-      } finally {
-        setLoadingDiscounts(false);
-      }
-    };
-    fetchDiscounts();
-  }, [visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -134,21 +115,7 @@ export default function DiscountModal({
             ))}
           </View>
 
-          {availableDiscounts.length > 0 && (
-            <>
-              <Text style={styles.sectionLabel}>Available Promotions</Text>
-              {loadingDiscounts ? <ActivityIndicator color={Theme.primary} style={{ marginVertical: 12 }} /> : (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.promoScroll}>
-                  {availableDiscounts.map((discount, idx) => (
-                    <TouchableOpacity key={idx} style={styles.discountCard} onPress={() => { setDiscountType("fixed"); setInputValue((discount.Discountprice || 0).toString()); }}>
-                      <Text style={styles.discountCardLabel}>${discount.Discountprice || 0}</Text>
-                      <Text style={styles.discountCardSmall}>on {discount.DiscountQty} qty</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              )}
-            </>
-          )}
+
 
           <Text style={styles.sectionLabel}>Custom Value</Text>
           <View style={styles.inputWrapper}>

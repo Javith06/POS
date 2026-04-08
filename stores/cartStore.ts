@@ -24,6 +24,7 @@ export type CartItem = {
 
   modifiers?: Modifier[];
   discount?: number;
+  basePrice?: number; // Added to store the original dish price for recalculation
 };
 
 type DiscountInfo = {
@@ -42,7 +43,7 @@ type CartState = {
 
   getCart: () => CartItem[];
 
-  addToCartGlobal: (item: Omit<CartItem, "qty" | "lineItemId">) => void;
+  addToCartGlobal: (item: Omit<CartItem, "qty" | "lineItemId">) => string;
   removeFromCartGlobal: (lineItemId: string) => void;
   clearCart: () => void;
   clearAllCarts: () => void;
@@ -52,6 +53,7 @@ type CartState = {
 
   setCartItems: (contextId: string, items: CartItem[]) => void;
   updateCartItemQty: (lineItemId: string, newQty: number, discount?: number) => void;
+  updateCartItemModifiers: (lineItemId: string, modifiers: Modifier[]) => void;
 };
 
 /* ================= STORE ================= */
@@ -98,7 +100,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   addToCartGlobal: (item) => {
     const { carts, currentContextId, discounts } = get();
-    if (!currentContextId) return;
+    if (!currentContextId) return "";
 
     const currentCart = carts[currentContextId] || [];
 
@@ -126,13 +128,15 @@ export const useCartStore = create<CartState>((set, get) => ({
     );
 
     let updatedCart;
+    const targetLineItemId = existing ? existing.lineItemId : uuidv4();
+    const basePrice = item.price || 0; // Store the original dish price
 
     if (existing) {
       updatedCart = currentCart.map((p) =>
         p.lineItemId === existing.lineItemId ? { ...p, qty: p.qty + 1 } : p,
       );
     } else {
-      updatedCart = [...currentCart, { ...item, qty: 1, lineItemId: uuidv4() }];
+      updatedCart = [...currentCart, { ...item, qty: 1, lineItemId: targetLineItemId, basePrice }];
     }
 
     const newDiscounts = { ...discounts };
@@ -145,6 +149,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       },
       discounts: newDiscounts,
     });
+
+    return targetLineItemId;
   },
 
   /* ================= REMOVE ================= */
@@ -221,6 +227,28 @@ export const useCartStore = create<CartState>((set, get) => ({
         ? { ...item, qty: Math.max(0, newQty), discount: discount !== undefined ? discount : item.discount } 
         : item
     ).filter(item => item.qty > 0);
+
+    set({
+      carts: {
+        ...carts,
+        [currentContextId]: updatedCart,
+      },
+    });
+  },
+
+  updateCartItemModifiers: (lineItemId: string, modifiers: Modifier[]) => {
+    const { carts, currentContextId } = get();
+    if (!currentContextId) return;
+
+    const currentCart = carts[currentContextId] || [];
+    const updatedCart = currentCart.map((item) => {
+      if (item.lineItemId === lineItemId) {
+        const base = item.basePrice || item.price || 0;
+        const extra = modifiers.reduce((sum, m) => sum + (m.Price || 0), 0);
+        return { ...item, modifiers, price: base + extra };
+      }
+      return item;
+    });
 
     set({
       carts: {

@@ -408,14 +408,20 @@ export default function Category() {
 
           {/* Locked */}
           {tableData && tableData.status === "LOCKED" && (
-            <View style={styles.lockedOverlay}>
+            <View style={styles.lockedOverlay} onLayout={() => console.log(`Table ${item.label} locked name: "${tableData.lockedByName}"`)}>
               <Ionicons name="lock-closed" size={Math.max(14, itemSize * 0.2)} color={Theme.danger} />
-              <Text style={[styles.timeText, { fontSize: smallFont, color: "#B91C1C" }]}>RESERVED</Text>
-              {getLockedName(item.label) && (
-                <Text style={[styles.lockedNameText, { fontSize: smallFont - 1 }]}>
-                  {getLockedName(item.label)}
-                </Text>
-              )}
+              <Text style={[styles.timeText, { fontSize: smallFont, color: "#B91C1C", fontWeight: "bold" }]}>RESERVED</Text>
+              {tableData.lockedByName ? (
+                <View style={{ backgroundColor: "#B91C1C", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 }}>
+                  <Text 
+                    style={[styles.lockedNameText, { fontSize: smallFont, color: "#FFF" }]} 
+                    numberOfLines={1} 
+                    ellipsizeMode="tail"
+                  >
+                    {tableData.lockedByName}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           )}
         </View>
@@ -492,6 +498,15 @@ export default function Category() {
 
         {/* RIGHT — Action Buttons */}
         <View style={[styles.navRightGroup, { gap: isTablet ? 8 : 6 }]}>
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => router.push("/TimeEntry")}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="time-outline" size={16} color={Theme.primary} />
+            {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Time Entry</Text>}
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.headerActionBtn}
             onPress={() => router.push("/members")}
@@ -778,7 +793,12 @@ const styles = StyleSheet.create({
   orderText: { color: Theme.textMuted, fontFamily: Fonts.regular },
   billText: { fontFamily: Fonts.black },
   lockedOverlay: { alignItems: "center", gap: 3, marginTop: 4 },
-  lockedNameText: { color: "#B45309", fontFamily: Fonts.semiBold, marginTop: 2 },
+  lockedNameText: { 
+    color: "#B91C1C", 
+    fontFamily: Fonts.bold, 
+    marginTop: 1,
+    textAlign: "center",
+  },
 
   /* ── Empty State ── */
   emptyContainer: {

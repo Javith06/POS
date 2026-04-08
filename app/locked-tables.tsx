@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "../constants/Fonts";
 import { Theme } from "../constants/theme";
 import { setOrderContext } from "../stores/orderContextStore";
+import { useTableStatusStore } from "../stores/tableStatusStore";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 
@@ -193,45 +194,56 @@ export default function LockedTablesScreen() {
     return allTables.filter((t) => getSectionFromDiningSection(t.diningSection) === activeSection);
   }, [allTables, activeSection]);
 
-  const renderTableItem = ({ item }: { item: TableType }) => (
-    <View style={[styles.tableCard, item.isLocked && styles.lockedCard]}>
-      <TouchableOpacity
-        style={styles.tableContent}
-        onPress={() => {
-          if (item.isLocked) {
-            Alert.alert("Locked Table", `Table ${item.tableNumber} is locked. Continue order processing?`, [
-              { text: "Cancel", style: "cancel" },
-              { text: "Continue Order", onPress: () => continueWithOrder(item.tableNumber, item.diningSection) },
-            ]);
-          } else {
-            lockTable(item.tableId, item.tableNumber);
-          }
-        }}
-      >
-        <View style={[styles.tableIcon, item.isLocked && styles.lockedIcon]}>
-          <Ionicons
-            name={item.isLocked ? "lock-closed" : "lock-open-outline"}
-            size={24}
-            color={item.isLocked ? Theme.warning : Theme.textMuted}
-          />
-        </View>
-        <Text style={styles.tableNumber}>{item.tableNumber}</Text>
-        <Text style={[styles.tableStatus, item.isLocked && styles.lockedStatus]}>
-          {item.isLocked ? "LOCKED" : "AVAILABLE"}
-        </Text>
-      </TouchableOpacity>
+  const renderTableItem = ({ item }: { item: TableType }) => {
+    const tableStatus = useTableStatusStore.getState().tables.find(t => 
+      t.section === getSectionFromDiningSection(item.diningSection) && t.tableNo === item.tableNumber
+    );
+    
+    // Define "Active" as anything with an order that isn't EMPTY or LOCKED
+    const isActive = tableStatus && ['SENT', 'HOLD', 'BILL_REQUESTED'].includes(tableStatus.status);
 
-      {item.isLocked && (
+    return (
+      <View style={[styles.tableCard, item.isLocked && styles.lockedCard, isActive && styles.activeCard]}>
         <TouchableOpacity
-          style={styles.unlockBtn}
-          onPress={() => unlockTable(item.tableId, item.tableNumber)}
-          activeOpacity={0.7}
+          style={styles.tableContent}
+          onPress={() => {
+            if (item.isLocked) {
+              Alert.alert("Locked Table", `Table ${item.tableNumber} is locked. Continue order processing?`, [
+                { text: "Cancel", style: "cancel" },
+                { text: "Continue Order", onPress: () => continueWithOrder(item.tableNumber, item.diningSection) },
+              ]);
+            } else if (isActive) {
+              Alert.alert("Table In Use", `Table ${item.tableNumber} currently has an active order and cannot be locked.`);
+            } else {
+              lockTable(item.tableId, item.tableNumber);
+            }
+          }}
         >
-          <Ionicons name="close-circle" size={22} color={Theme.danger} />
+          <View style={[styles.tableIcon, item.isLocked && styles.lockedIcon, isActive && styles.activeIcon]}>
+            <Ionicons
+              name={item.isLocked ? "lock-closed" : isActive ? "restaurant" : "lock-open-outline"}
+              size={24}
+              color={item.isLocked ? Theme.warning : isActive ? Theme.success : Theme.textMuted}
+            />
+          </View>
+          <Text style={styles.tableNumber}>{item.tableNumber}</Text>
+          <Text style={[styles.tableStatus, item.isLocked && styles.lockedStatus, isActive && styles.activeStatus]}>
+            {item.isLocked ? "LOCKED" : isActive ? "IN USE" : "AVAILABLE"}
+          </Text>
         </TouchableOpacity>
-      )}
-    </View>
-  );
+
+        {item.isLocked && (
+          <TouchableOpacity
+            style={styles.unlockBtn}
+            onPress={() => unlockTable(item.tableId, item.tableNumber)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close-circle" size={22} color={Theme.danger} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -422,6 +434,9 @@ const styles = StyleSheet.create({
   tableNumber: { color: Theme.textPrimary, fontFamily: Fonts.black, fontSize: 20, letterSpacing: 0.5 },
   tableStatus: { color: Theme.textMuted, fontFamily: Fonts.bold, fontSize: 11, marginTop: 8, textTransform: "uppercase" },
   lockedStatus: { color: Theme.warning },
+  activeCard: { backgroundColor: Theme.success + "05", borderColor: Theme.success + "30" },
+  activeIcon: { backgroundColor: Theme.success + "10", borderColor: Theme.success + "20" },
+  activeStatus: { color: Theme.success },
   unlockBtn: {
     position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: 10,
     backgroundColor: Theme.danger + "15", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Theme.danger + "30",

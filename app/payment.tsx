@@ -297,6 +297,14 @@ export default function PaymentScreen() {
                 ? `Table ${context?.tableNo} • ${context?.section}`
                 : `Takeaway • ${context?.section}`}
             </Text>
+            {context?.tableNo && useTableStatusStore.getState().getLockedName(context.tableNo, context.section) && (
+              <View style={{ marginTop: 4, backgroundColor: Theme.tableLocked.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1, borderColor: Theme.tableLocked.border, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <Ionicons name="lock-closed" size={12} color={Theme.tableLocked.border} />
+                <Text style={{ color: Theme.tableLocked.border, fontSize: 11, fontFamily: Fonts.black, textTransform: 'uppercase' }}>
+                  RESERVED: {useTableStatusStore.getState().getLockedName(context.tableNo, context.section)}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.rightHeader}>

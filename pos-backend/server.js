@@ -157,8 +157,14 @@ const initDB = async (maxRetries = 3, retryDelay = 3000) => {
         )
       `);
 
+      // Ensure TableMaster has LockedByName column
+      await pool.request().query(`
+        IF NOT EXISTS(SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='TableMaster' AND COLUMN_NAME='LockedByName')
+           ALTER TABLE TableMaster ADD LockedByName NVARCHAR(255);
+      `);
+
       console.log(
-        "✅ Database initialized: SettlementItemDetail, MemberMaster, cancellation tracking, and DailyAttendance ready.",
+        "✅ Database initialized: SettlementItemDetail, MemberMaster, cancellation tracking, TableMaster LockedByName, and DailyAttendance ready.",
       );
       return; // Success - exit
     } catch (err) {
@@ -335,7 +341,8 @@ app.get("/tables", async (req, res) => {
       SELECT
         TableId AS id,
         CAST(TableNumber AS VARCHAR(50)) AS label,
-        CAST(DiningSection AS VARCHAR(10)) AS DiningSection
+        CAST(DiningSection AS VARCHAR(10)) AS DiningSection,
+        LockedByName as lockedByName
       FROM TableMaster
     `;
 
@@ -364,7 +371,7 @@ app.get("/api/tables/locked", async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool.request().query(`
-      SELECT TableId as tableId, TableNumber as tableNumber, DiningSection
+      SELECT TableId as tableId, TableNumber as tableNumber, DiningSection, LockedByName as lockedByName
       FROM TableMaster 
       WHERE Status = 1
     `);
@@ -389,10 +396,11 @@ app.post("/api/tables/lock-persistent", async (req, res) => {
 
     const request = pool.request();
     request.input("tableId", sql.UniqueIdentifier, tableId);
+    request.input("lockedByName", sql.NVarChar, lockedByName || null);
 
     const result = await request.query(`
       UPDATE TableMaster 
-      SET Status = 1 
+      SET Status = 1, LockedByName = @lockedByName 
       WHERE TableId = @tableId
     `);
 
@@ -439,7 +447,7 @@ app.post("/api/tables/unlock-persistent", async (req, res) => {
       .input("tableId", sql.VarChar(50), tableId)
       .query(`
         UPDATE TableMaster 
-        SET Status = 0 
+        SET Status = 0, LockedByName = NULL 
         WHERE CAST(TableId AS VARCHAR(50)) = @tableId
       `);
 
@@ -617,6 +625,30 @@ app.get("/dishgroups/:CategoryId", async (req, res) => {
 });
 
 /* ================= DISHES ================= */
+app.get("/api/dishes/all", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT
+        d.DishId,
+        d.Name,
+        d.DishGroupId,
+        ISNULL(p.Amount, 0) AS Price,
+        d.Imageid,
+        CASE WHEN i.Imageid IS NOT NULL THEN 1 ELSE 0 END AS HasImage
+      FROM DishMaster d
+      INNER JOIN DishPriceList p ON d.DishId = p.DishId
+      LEFT JOIN ImageList i ON d.Imageid = i.Imageid
+      WHERE d.IsActive = 1
+      ORDER BY d.Name ASC
+    `);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("ALL DISHES FETCH ERROR:", err);
+    res.status(500).send(err.message);
+  }
+});
+
 app.get("/dishes/:DishGroupId", async (req, res) => {
   try {
     const pool = await poolPromise;

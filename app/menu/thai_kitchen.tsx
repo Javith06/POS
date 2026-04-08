@@ -1,10 +1,12 @@
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { API_URL } from "@/constants/Config";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,12 +15,11 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Theme } from "../../constants/theme";
 import CartSidebar from "../../components/CartSidebar";
 import { Fonts } from "../../constants/Fonts";
+import { Theme } from "../../constants/theme";
 import {
   addToCartGlobal,
   getContextId,
@@ -26,51 +27,91 @@ import {
   useCartStore,
 } from "../../stores/cartStore";
 import { useOrderContextStore } from "../../stores/orderContextStore";
-import { API_URL } from "@/constants/Config";
 
 // --- COMPONENTS ---
 
 const NavRail = () => {
   const router = useRouter();
   const navItems = [
-    { id: 'home', icon: 'home-outline', label: 'Home', active: true },
-    { id: 'tables', icon: 'grid-outline', label: 'Tables' },
-    { id: 'settings', icon: 'settings-outline', label: 'Settings' },
+    { id: "home", icon: "home-outline", label: "Home", active: true },
+    { id: "tables", icon: "grid-outline", label: "Tables" },
+    { id: "settings", icon: "settings-outline", label: "Settings" },
   ];
 
   return (
     <View style={styles.rail}>
       <View style={styles.railTop}>
         {navItems.map((item) => (
-          <TouchableOpacity key={item.id} style={[styles.railItem, item.active && styles.railItemActive]}>
-            <Ionicons name={item.icon as any} size={22} color={item.active ? Theme.primary : Theme.textSecondary} />
-            <Text style={[styles.railLabel, item.active && styles.railLabelActive]}>{item.label}</Text>
+          <TouchableOpacity
+            key={item.id}
+            style={[styles.railItem, item.active && styles.railItemActive]}
+          >
+            <Ionicons
+              name={item.icon as any}
+              size={22}
+              color={item.active ? Theme.primary : Theme.textSecondary}
+            />
+            <Text
+              style={[styles.railLabel, item.active && styles.railLabelActive]}
+            >
+              {item.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
       <View style={styles.railBottom}>
-         <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace("/")}>
-            <Ionicons name="log-out-outline" size={22} color={Theme.textSecondary} />
-            <Text style={styles.railLabel}>Logout</Text>
-         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() => router.replace("/")}
+        >
+          <Ionicons
+            name="log-out-outline"
+            size={22}
+            color={Theme.textSecondary}
+          />
+          <Text style={styles.railLabel}>Logout</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-const DishCard = ({ dish, onPress, width }: { dish: any, onPress: () => void, width: number }) => {
+const DishCard = ({
+  dish,
+  onPress,
+  width,
+}: {
+  dish: any;
+  onPress: () => void;
+  width: number;
+}) => {
   return (
     <TouchableOpacity style={[styles.card, { width }]} onPress={onPress}>
       <View style={styles.dishImageWrap}>
-          {dish.ImageBase64 ? (
+        {dish.ImageBase64 ? (
           <Image source={{ uri: dish.ImageBase64 }} style={styles.dishImg} />
         ) : (
-          <View style={[styles.dishImg, { justifyContent: "center", alignItems: "center", backgroundColor: Theme.bgMuted }]}>
-             <Ionicons name="restaurant-outline" size={40} color={Theme.textMuted} />
+          <View
+            style={[
+              styles.dishImg,
+              {
+                justifyContent: "center",
+                alignItems: "center",
+                backgroundColor: Theme.bgMuted,
+              },
+            ]}
+          >
+            <Ionicons
+              name="restaurant-outline"
+              size={40}
+              color={Theme.textMuted}
+            />
           </View>
         )}
       </View>
-      <Text style={styles.dishName} numberOfLines={2}>{dish.Name}</Text>
+      <Text style={styles.dishName} numberOfLines={2}>
+        {dish.Name}
+      </Text>
       <Text style={styles.dishPrice}>${(dish.Price || 0).toFixed(2)}</Text>
     </TouchableOpacity>
   );
@@ -99,12 +140,15 @@ export default function MenuScreen() {
   const [selectedDish, setSelectedDish] = useState<any | null>(null);
   const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>([]);
   const [loadingModifiers, setLoadingModifiers] = useState(false);
-  
+
   // Custom Item Submodal (Screenshot Flow)
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customItemName, setCustomItemName] = useState("");
   const [customItemPrice, setCustomItemPrice] = useState("");
   const [customMods, setCustomMods] = useState<any[]>([]);
+  const [editingLineItemId, setEditingLineItemId] = useState<string | null>(
+    null,
+  );
 
   const orderContext = useOrderContextStore((state) => state.currentOrder);
   const carts = useCartStore((state) => state.carts);
@@ -127,18 +171,22 @@ export default function MenuScreen() {
   useEffect(() => {
     setIsInitialLoading(true);
     fetch(`${API_URL}/kitchens`)
-      .then(res => res.json())
-      .then(data => {
-        const filtered = (data || []).filter((k: any) => !k.KitchenTypeName.includes("TEST"));
+      .then((res) => res.json())
+      .then((data) => {
+        const safeData = Array.isArray(data) ? data : [];
+        const filtered = safeData.filter(
+          (k: any) => k.KitchenTypeName && !k.KitchenTypeName.includes("TEST"),
+        );
         setKitchens(filtered);
-        if (filtered.length > 0) loadGroups(filtered[2]?.CategoryId || filtered[0].CategoryId);
+        if (filtered.length > 0)
+          loadGroups(filtered[0].CategoryId);
         setIsInitialLoading(false);
       });
 
     fetch(`${API_URL}/api/dishes/all`)
-      .then(res => res.json())
-      .then(data => setAllDishes(data || []))
-      .catch(e => console.log(e));
+      .then((res) => res.json())
+      .then((data) => setAllDishes(Array.isArray(data) ? data : []))
+      .catch((e) => console.log(e));
   }, []);
 
   const loadGroups = async (kitchenId: string) => {
@@ -146,9 +194,11 @@ export default function MenuScreen() {
     try {
       const res = await fetch(`${API_URL}/dishgroups/${kitchenId}`);
       const data = await res.json();
-      setGroups(data || []);
-      if (data.length > 0) loadDishes(data[0].DishGroupId);
-    } catch (e) { console.log(e); }
+      setGroups(Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length > 0) loadDishes(data[0].DishGroupId);
+    } catch (e) {
+      console.log(e);
+    }
   };
 
   const loadDishes = async (groupId: string) => {
@@ -157,24 +207,34 @@ export default function MenuScreen() {
     try {
       const res = await fetch(`${API_URL}/dishes/${groupId}`);
       const data = await res.json();
-      setItems(data || []);
-    } catch (e) { console.log(e); }
-    finally { setIsLoadingDishes(false); }
+      setItems(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.log(e);
+    } finally {
+      setIsLoadingDishes(false);
+    }
   };
 
   const filteredItems = useMemo(() => {
-    if (!searchText.trim()) return items;
-    return allDishes.filter(d => d.Name.toLowerCase().includes(searchText.toLowerCase()));
+    const query = searchText.trim().toLowerCase();
+    if (!query) return items;
+
+    // Search across all dishes if query exists
+    return allDishes.filter((d) => {
+      const name = (d.Name || d.DishName || "").toLowerCase();
+      return name.includes(query);
+    });
   }, [searchText, items, allDishes]);
 
-  const openModifiers = async (dish: any) => {
+  const openModifiers = async (dish: any, lineItemId: string) => {
     setSelectedDish(dish);
+    setEditingLineItemId(lineItemId);
     setSelectedModifierIds([]);
     setCustomMods([]);
     setModifiers([]);
     setLoadingModifiers(true);
     setShowModifier(true);
-    
+
     // Reset custom submodal
     setShowCustomModal(false);
     setCustomItemName("");
@@ -188,11 +248,16 @@ export default function MenuScreen() {
       if (Array.isArray(data) && data.length > 0) {
         setModifiers(data);
       } else {
+        // No modifiers for this dish, auto-close the modal
         setModifiers([]);
+        setShowModifier(false);
+        setEditingLineItemId(null);
       }
     } catch (err) {
       console.error(err);
       setModifiers([]);
+      setShowModifier(false);
+      setEditingLineItemId(null);
     } finally {
       setLoadingModifiers(false);
     }
@@ -203,7 +268,13 @@ export default function MenuScreen() {
       setShowCustomModal(true);
       return;
     }
-    setSelectedModifierIds(prev => prev.includes(mod.ModifierID)? prev.filter(id => id !== mod.ModifierID) : [...prev, mod.ModifierID]);
+
+    setSelectedModifierIds((prev) => {
+      const next = prev.includes(mod.ModifierID)
+        ? prev.filter((id) => id !== mod.ModifierID)
+        : [...prev, mod.ModifierID];
+      return next;
+    });
   };
 
   const addCustomMod = () => {
@@ -212,33 +283,45 @@ export default function MenuScreen() {
     const newMod = {
       ModifierID: newId,
       ModifierName: customItemName,
-      Price: parseFloat(customItemPrice) || 0
+      Price: parseFloat(customItemPrice) || 0,
     };
+
     setCustomMods(prev => [...prev, newMod]);
     setSelectedModifierIds(prev => [...prev, newId]);
+
     setShowCustomModal(false);
     setCustomItemName("");
     setCustomItemPrice("");
   };
 
   const addWithModifiers = () => {
-    if (!selectedDish) return;
-    const allAvailable = [...modifiers, ...customMods];
-    const selectedMods = allAvailable.filter(m => selectedModifierIds.includes(m.ModifierID));
-    const extra = selectedMods.reduce((sum, m) => sum + (m.Price || 0), 0);
-    
-    addToCartGlobal({
-      id: selectedDish.DishId,
-      name: selectedDish.Name,
-      price: (selectedDish.Price || 0) + extra,
-      modifiers: selectedMods.map(m => ({ ModifierId: m.ModifierID, ModifierName: m.ModifierName, Price: m.Price || 0 })),
-    });
+    if (editingLineItemId) {
+      const allAvailable = [...modifiers, ...customMods];
+      const selectedMods = allAvailable.filter((m) =>
+        selectedModifierIds.includes(m.ModifierID),
+      );
+      
+      const modsToAdd = selectedMods.map((m) => ({
+        ModifierId: m.ModifierID || m.ModifierId,
+        ModifierName: m.ModifierName,
+        Price: m.Price || 0,
+      }));
+
+      useCartStore.getState().updateCartItemModifiers(
+        editingLineItemId,
+        modsToAdd as any
+      );
+    }
     setShowModifier(false);
+    setEditingLineItemId(null);
   };
 
-  if (!orderContext) return (
-    <SafeAreaView style={styles.centered}><Text style={styles.title}>Select Table First</Text></SafeAreaView>
-  );
+  if (!orderContext)
+    return (
+      <SafeAreaView style={styles.centered}>
+        <Text style={styles.title}>Select Table First</Text>
+      </SafeAreaView>
+    );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -251,38 +334,70 @@ export default function MenuScreen() {
         <View style={[styles.main, { width: mainWidth }]}>
           {/* TOP BAR */}
           <View style={styles.topBar}>
-            <TouchableOpacity onPress={() => router.replace("/(tabs)/category")} style={styles.backBtn}>
-               <Ionicons name="arrow-back" size={24} color={Theme.textPrimary} />
+            <TouchableOpacity
+              onPress={() => router.replace("/(tabs)/category")}
+              style={styles.backBtn}
+            >
+              <Ionicons name="arrow-back" size={24} color={Theme.textPrimary} />
             </TouchableOpacity>
             <View style={styles.searchWrap}>
-              <Ionicons name="search" size={20} color={Theme.textMuted} style={styles.searchIcon} />
-              <TextInput 
-                style={styles.searchInput} 
-                placeholder="Search products....." 
+              <Ionicons
+                name="search"
+                size={20}
+                color={Theme.textMuted}
+                style={styles.searchIcon}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search products....."
                 value={searchText}
                 onChangeText={setSearchText}
               />
+              {searchText.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchText("")}>
+                  <Ionicons
+                    name="close-circle"
+                    size={18}
+                    color={Theme.textMuted}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
             <View style={styles.topActions}>
-               <TouchableOpacity style={styles.iconBtn}><Ionicons name="refresh" size={20} color={Theme.textPrimary} /></TouchableOpacity>
-               {!isLarge && (
-                 <TouchableOpacity style={[styles.iconBtn, { backgroundColor: Theme.success }]} onPress={() => router.push("/cart")}>
-                   <Ionicons name="cart" size={18} color="#fff" />
-                 </TouchableOpacity>
-               )}
+              {!isLarge && (
+                <TouchableOpacity
+                  style={[styles.iconBtn, { backgroundColor: Theme.success }]}
+                  onPress={() => router.push("/cart")}
+                >
+                  <Ionicons name="cart" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
           {/* TWO-TIER CATEGORY TABS */}
           <View style={styles.categoryNavigation}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.catScroll}
+            >
               {kitchens.map((k) => (
-                <TouchableOpacity 
-                  key={k.CategoryId} 
-                  style={[styles.catPill, selectedKitchenId === k.CategoryId && styles.catPillActive]}
+                <TouchableOpacity
+                  key={k.CategoryId}
+                  style={[
+                    styles.catPill,
+                    selectedKitchenId === k.CategoryId && styles.catPillActive,
+                  ]}
                   onPress={() => loadGroups(k.CategoryId)}
                 >
-                  <Text style={[styles.catText, selectedKitchenId === k.CategoryId && styles.catTextActive]}>
+                  <Text
+                    style={[
+                      styles.catText,
+                      selectedKitchenId === k.CategoryId &&
+                        styles.catTextActive,
+                    ]}
+                  >
                     {k.KitchenTypeName}
                   </Text>
                 </TouchableOpacity>
@@ -290,14 +405,27 @@ export default function MenuScreen() {
             </ScrollView>
 
             <View style={{ marginTop: 10 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.groupScroll}
+              >
                 {groups.map((g) => (
-                  <TouchableOpacity 
-                    key={g.DishGroupId} 
-                    style={[styles.groupPill, selectedGroup === g.DishGroupId && styles.groupPillActive]}
+                  <TouchableOpacity
+                    key={g.DishGroupId}
+                    style={[
+                      styles.groupPill,
+                      selectedGroup === g.DishGroupId && styles.groupPillActive,
+                    ]}
                     onPress={() => loadDishes(g.DishGroupId)}
                   >
-                    <Text style={[styles.groupText, selectedGroup === g.DishGroupId && styles.groupTextActive]}>
+                    <Text
+                      style={[
+                        styles.groupText,
+                        selectedGroup === g.DishGroupId &&
+                          styles.groupTextActive,
+                      ]}
+                    >
                       {g.DishGroupName}
                     </Text>
                   </TouchableOpacity>
@@ -309,7 +437,10 @@ export default function MenuScreen() {
           {/* PRODUCT GRID */}
           <View style={styles.gridContainer}>
             {isLoadingDishes ? (
-              <ActivityIndicator color={Theme.primary} style={{ marginTop: 50 }} />
+              <ActivityIndicator
+                color={Theme.primary}
+                style={{ marginTop: 50 }}
+              />
             ) : (
               <FlatList
                 data={filteredItems}
@@ -317,10 +448,17 @@ export default function MenuScreen() {
                 numColumns={columns}
                 key={columns}
                 renderItem={({ item }) => (
-                  <DishCard 
-                    dish={item} 
-                    width={cardWidth} 
-                    onPress={() => openModifiers(item)} 
+                  <DishCard
+                    dish={item}
+                    width={cardWidth}
+                    onPress={() => {
+                      const lineId = addToCartGlobal({
+                        id: item.DishId,
+                        name: item.Name,
+                        price: item.Price || 0,
+                      });
+                      openModifiers(item, lineId);
+                    }}
                   />
                 )}
                 columnWrapperStyle={{ gap: gap, marginBottom: gap }}
@@ -340,81 +478,122 @@ export default function MenuScreen() {
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Select modifiers for {selectedDish.Name}</Text>
+                  <Text style={styles.modalTitle}>
+                    Modifiers {selectedDish.Name}
+                  </Text>
                 </View>
-                <TouchableOpacity onPress={() => setShowModifier(false)} style={styles.modalClose}>
-                  <Ionicons name="close" size={20} color={Theme.textSecondary} />
+                <TouchableOpacity
+                  onPress={() => setShowModifier(false)}
+                  style={styles.modalClose}
+                >
+                  <Ionicons
+                    name="close"
+                    size={20}
+                    color={Theme.textSecondary}
+                  />
                 </TouchableOpacity>
               </View>
-              
+
               <View style={styles.modalBody}>
-                {loadingModifiers ? <ActivityIndicator color={Theme.primary} size="large" /> : (
-                  <View style={styles.modifierList}>
-                    {[...modifiers, ...customMods].map((m) => (
-                      <TouchableOpacity 
-                        key={m.ModifierID} 
+                {loadingModifiers ? (
+                  <ActivityIndicator color={Theme.primary} size="large" />
+                ) : (
+                  <ScrollView style={styles.modifierList} showsVerticalScrollIndicator={false}>
+                    {modifiers.map((m) => (
+                      <TouchableOpacity
+                        key={m.ModifierID}
                         style={styles.modifierRow}
                         onPress={() => toggleModifier(m)}
                       >
-                         <Text style={styles.modifierName}>{m.ModifierName}</Text>
-                         <View style={[styles.checkbox, selectedModifierIds.includes(m.ModifierID) && styles.checkboxActive]}>
-                            {selectedModifierIds.includes(m.ModifierID) && <Ionicons name="checkmark" size={14} color="#fff" />}
-                         </View>
+                        <Text style={styles.modifierName}>
+                          {m.ModifierName}
+                        </Text>
+                        <View
+                          style={[
+                            styles.checkbox,
+                            selectedModifierIds.includes(m.ModifierID) &&
+                              styles.checkboxActive,
+                          ]}
+                        >
+                          {selectedModifierIds.includes(m.ModifierID) && (
+                            <Ionicons name="checkmark" size={14} color="#fff" />
+                          )}
+                        </View>
                       </TouchableOpacity>
                     ))}
-                  </View>
+                  </ScrollView>
                 )}
               </View>
 
               <View style={styles.modalFooter}>
-                <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setShowModifier(false)}>
+                <TouchableOpacity
+                  style={styles.modalBtnCancel}
+                  onPress={() => setShowModifier(false)}
+                >
                   <Text style={styles.modalBtnTextCancel}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.modalBtnAdd} onPress={addWithModifiers}>
-                   <Ionicons name="cart" size={18} color="#fff" />
-                   <Text style={styles.modalBtnTextAdd}>Add to Cart</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtnAdd,
+                    { backgroundColor: Theme.success },
+                  ]}
+                  onPress={addWithModifiers}
+                >
+                  <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                  <Text style={styles.modalBtnTextAdd}>Done</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* ADD CUSTOM ITEM SUB-MODAL (Screenshot 2 Style) */}
             {showCustomModal && (
-              <View style={[styles.modalOverlay, { zIndex: 2000, backgroundColor: "rgba(0,0,0,0.8)" }]}>
+              <View
+                style={[
+                  styles.modalOverlay,
+                  { zIndex: 2000, backgroundColor: "rgba(0,0,0,0.8)" },
+                ]}
+              >
                 <View style={styles.customItemModal}>
-                   <Text style={styles.customModalTitle}>Add Custom Item</Text>
-                   
-                   <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Item Name *</Text>
-                      <TextInput 
-                        style={styles.customInput} 
-                        placeholder="Enter item name"
-                        placeholderTextColor="#666"
-                        value={customItemName}
-                        onChangeText={setCustomItemName}
-                        autoFocus
-                      />
-                   </View>
+                  <Text style={styles.customModalTitle}>Add Custom Item</Text>
 
-                   <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Price (Optional)</Text>
-                      <TextInput 
-                        style={styles.customInput} 
-                        placeholder="Enter price"
-                        placeholderTextColor="#666"
-                        keyboardType="numeric"
-                        value={customItemPrice}
-                        onChangeText={setCustomItemPrice}
-                      />
-                   </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Item Name *</Text>
+                    <TextInput
+                      style={styles.customInput}
+                      placeholder="Enter item name"
+                      placeholderTextColor="#666"
+                      value={customItemName}
+                      onChangeText={setCustomItemName}
+                      autoFocus
+                    />
+                  </View>
 
-                   <View style={styles.customModalActions}>
-                      <TouchableOpacity style={styles.customBtnCancel} onPress={() => setShowCustomModal(false)}>
-                         <Text style={styles.customBtnTextCancel}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.customBtnAdd} onPress={addCustomMod}>
-                         <Text style={styles.customBtnTextAdd}>Add Item</Text>
-                      </TouchableOpacity>
-                   </View>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.inputLabel}>Price (Optional)</Text>
+                    <TextInput
+                      style={styles.customInput}
+                      placeholder="Enter price"
+                      placeholderTextColor="#666"
+                      keyboardType="numeric"
+                      value={customItemPrice}
+                      onChangeText={setCustomItemPrice}
+                    />
+                  </View>
+
+                  <View style={styles.customModalActions}>
+                    <TouchableOpacity
+                      style={styles.customBtnCancel}
+                      onPress={() => setShowCustomModal(false)}
+                    >
+                      <Text style={styles.customBtnTextCancel}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.customBtnAdd}
+                      onPress={addCustomMod}
+                    >
+                      <Text style={styles.customBtnTextAdd}>Add Item</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
@@ -430,67 +609,295 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Theme.bgMain },
   layout: { flex: 1, flexDirection: "row" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  rail: { width: 90, backgroundColor: "#fff", borderRightWidth: 1, borderRightColor: Theme.border, alignItems: "center", paddingVertical: 20 },
+  rail: {
+    width: 90,
+    backgroundColor: "#fff",
+    borderRightWidth: 1,
+    borderRightColor: Theme.border,
+    alignItems: "center",
+    paddingVertical: 20,
+  },
   railTop: { flex: 1, gap: 20 },
-  railItem: { width: 64, height: 64, justifyContent: "center", alignItems: "center", borderRadius: 16 },
+  railItem: {
+    width: 64,
+    height: 64,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 16,
+  },
   railItemActive: { backgroundColor: Theme.bgMain },
-  railLabel: { fontSize: 10, fontFamily: Fonts.bold, color: Theme.textSecondary, marginTop: 4 },
+  railLabel: {
+    fontSize: 10,
+    fontFamily: Fonts.bold,
+    color: Theme.textSecondary,
+    marginTop: 4,
+  },
   railLabelActive: { color: Theme.primary },
   railBottom: { gap: 20, alignItems: "center" },
   logoutBtn: { alignItems: "center" },
   main: { flex: 1, padding: 20 },
-  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
-  backBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#fff", justifyContent: "center", alignItems: "center", ...Theme.shadowSm },
-  searchWrap: { flex: 0.7, height: 48, backgroundColor: "#fff", borderRadius: 12, borderWidth: 1, borderColor: Theme.border, flexDirection: "row", alignItems: "center", paddingHorizontal: 15, ...Theme.shadowSm },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    ...Theme.shadowSm,
+  },
+  searchWrap: {
+    flex: 0.7,
+    height: 48,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Theme.border,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    ...Theme.shadowSm,
+  },
   searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontFamily: Fonts.medium, fontSize: 14, color: Theme.textPrimary },
+  searchInput: {
+    flex: 1,
+    fontFamily: Fonts.medium,
+    fontSize: 14,
+    color: Theme.textPrimary,
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
+  },
   topActions: { flexDirection: "row", alignItems: "center", gap: 12 },
-  iconBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#fff", justifyContent: "center", alignItems: "center", ...Theme.shadowSm },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    ...Theme.shadowSm,
+  },
   categoryNavigation: { marginBottom: 25 },
   catScroll: { gap: 10 },
-  catPill: { paddingHorizontal: 20, height: 40, borderRadius: 12, backgroundColor: "#fff", borderWidth: 1, borderColor: Theme.border, justifyContent: "center", alignItems: "center" },
-  catPillActive: { backgroundColor: Theme.primaryLight, borderColor: Theme.primary },
+  catPill: {
+    paddingHorizontal: 20,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: Theme.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  catPillActive: {
+    backgroundColor: Theme.primaryLight,
+    borderColor: Theme.primary,
+    ...Theme.shadowSm,
+  },
   catText: { fontSize: 14, fontFamily: Fonts.bold, color: Theme.textSecondary },
   catTextActive: { color: Theme.primary },
   groupScroll: { gap: 8 },
-  groupPill: { paddingHorizontal: 16, height: 32, borderRadius: full, backgroundColor: "transparent", borderWidth: 0, justifyContent: "center", alignItems: "center" },
-  groupPillActive: { backgroundColor: Theme.bgCard, borderWidth: 1, borderColor: Theme.border },
+  groupPill: {
+    paddingHorizontal: 16,
+    height: 32,
+    borderRadius: full,
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  groupPillActive: {
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: Theme.border,
+    ...Theme.shadowSm,
+  },
   groupText: { fontSize: 12, fontFamily: Fonts.medium, color: Theme.textMuted },
   groupTextActive: { color: Theme.textPrimary, fontFamily: Fonts.bold },
   gridContainer: { flex: 1 },
   listPadding: { paddingBottom: 80 },
-  card: { backgroundColor: "#fff", borderRadius: 20, padding: 10, alignItems: "center", ...Theme.shadowMd },
-  dishImageWrap: { width: 70, height: 70, borderRadius: 35, overflow: "hidden", marginBottom: 12, backgroundColor: Theme.bgMain },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 10,
+    alignItems: "center",
+    ...Theme.shadowMd,
+  },
+  dishImageWrap: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    overflow: "hidden",
+    marginBottom: 12,
+    backgroundColor: Theme.bgMain,
+  },
   dishImg: { width: "100%", height: "100%" },
-  dishName: { fontSize: 13, fontFamily: Fonts.black, color: Theme.textPrimary, textAlign: "center", height: 36 },
-  dishPrice: { fontSize: 14, fontFamily: Fonts.black, color: Theme.primary, marginTop: 4 },
+  dishName: {
+    fontSize: 13,
+    fontFamily: Fonts.black,
+    color: Theme.textPrimary,
+    textAlign: "center",
+    minHeight: 40,
+    lineHeight: 18,
+  },
+  dishPrice: {
+    fontSize: 14,
+    fontFamily: Fonts.black,
+    color: Theme.primary,
+    marginTop: 4,
+  },
   title: { fontSize: 24, fontFamily: Fonts.black },
-  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", zIndex: 1000 },
-  modalContent: { width: "85%", maxWidth: 440, backgroundColor: "#fff", borderRadius: 20, padding: 18, ...Theme.shadowLg, borderWidth: 1, borderColor: Theme.border },
-  modalHeader: { flexDirection: "row", justifyContent: "center", alignItems: "center", marginBottom: 15, position: "relative" },
-  modalTitle: { fontSize: 18, fontFamily: Fonts.black, color: Theme.primary, textAlign: "center" },
-  modalClose: { position: "absolute", right: -5, top: -5, width: 32, height: 32, justifyContent: "center", alignItems: "center", backgroundColor: Theme.bgMuted, borderRadius: 16 },
-  modalBody: { maxHeight: 400 },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  modalContent: {
+    width: "85%",
+    maxWidth: 480,
+    maxHeight: "90%",
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 24,
+    ...Theme.shadowLg,
+    borderWidth: 1,
+    borderColor: Theme.border,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: Fonts.black,
+    color: Theme.primary,
+  },
+  modalClose: {
+    width: 36,
+    height: 36,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: Theme.bgMuted,
+    borderRadius: 18,
+  },
+  modalBody: { flexShrink: 1 },
   modifierList: { borderTopWidth: 1, borderTopColor: Theme.border },
-  modifierRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Theme.bgMain },
-  modifierName: { color: Theme.textPrimary, fontSize: 15, fontFamily: Fonts.semiBold },
-  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Theme.primary, justifyContent: "center", alignItems: "center" },
+  modifierRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.bgMain,
+  },
+  modifierName: {
+    color: Theme.textPrimary,
+    fontSize: 16,
+    fontFamily: Fonts.bold,
+  },
+  checkbox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: Theme.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   checkboxActive: { backgroundColor: Theme.primary },
-  modalFooter: { flexDirection: "row", gap: 10, marginTop: 20 },
-  modalBtnCancel: { flex: 1, height: 48, borderRadius: 14, backgroundColor: Theme.bgMuted, justifyContent: "center", alignItems: "center" },
-  modalBtnTextCancel: { color: Theme.textSecondary, fontSize: 15, fontFamily: Fonts.bold },
-  modalBtnAdd: { flex: 1.2, height: 48, borderRadius: 14, backgroundColor: Theme.primary, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 8 },
-  modalBtnTextAdd: { color: "#fff", fontSize: 15, fontFamily: Fonts.black },
+  modalFooter: { flexDirection: "row", gap: 12, marginTop: 24 },
+  modalBtnCancel: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: Theme.bgMuted,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBtnTextCancel: {
+    color: Theme.textSecondary,
+    fontSize: 16,
+    fontFamily: Fonts.bold,
+  },
+  modalBtnAdd: {
+    flex: 1.5,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: Theme.success,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 8,
+    ...Theme.shadowSm,
+  },
+  modalBtnTextAdd: { color: "#fff", fontSize: 16, fontFamily: Fonts.black },
 
   /* Submodal Styling (Screenshot 2) */
-  customItemModal: { width: 320, backgroundColor: "#fff", borderRadius: 24, padding: 24, borderWidth: 1, borderColor: Theme.border, ...Theme.shadowLg },
-  customModalTitle: { fontSize: 20, fontFamily: Fonts.black, color: Theme.primary, textAlign: "center", marginBottom: 20 },
+  customItemModal: {
+    width: "85%",
+    maxWidth: 380,
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 24,
+    ...Theme.shadowLg,
+    borderWidth: 1,
+    borderColor: Theme.border,
+  },
+  customModalTitle: {
+    fontSize: 20,
+    fontFamily: Fonts.black,
+    color: Theme.textPrimary,
+    textAlign: "center",
+    marginBottom: 20,
+  },
   inputGroup: { marginBottom: 18 },
-  inputLabel: { color: Theme.textPrimary, fontSize: 14, fontFamily: Fonts.bold, marginBottom: 8 },
-  customInput: { height: 48, backgroundColor: Theme.bgMain, borderRadius: 12, borderWidth: 1, borderColor: Theme.border, paddingHorizontal: 12, color: Theme.textPrimary, fontSize: 15, fontFamily: Fonts.medium },
-  customModalActions: { flexDirection: "row", gap: 10, marginTop: 5 },
-  customBtnCancel: { flex: 1, height: 48, borderRadius: 14, backgroundColor: Theme.bgMuted, justifyContent: "center", alignItems: "center" },
-  customBtnTextCancel: { color: Theme.textSecondary, fontSize: 15, fontFamily: Fonts.bold },
-  customBtnAdd: { flex: 1, height: 48, borderRadius: 14, backgroundColor: Theme.primary, justifyContent: "center", alignItems: "center" },
-  customBtnTextAdd: { color: "#fff", fontSize: 15, fontFamily: Fonts.black },
+  inputLabel: {
+    color: Theme.textSecondary,
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    marginBottom: 8,
+  },
+  customInput: {
+    height: 52,
+    backgroundColor: Theme.bgMain,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Theme.border,
+    paddingHorizontal: 16,
+    color: Theme.textPrimary,
+    fontSize: 16,
+    fontFamily: Fonts.medium,
+  },
+  customModalActions: { flexDirection: "row", gap: 12, marginTop: 10 },
+  customBtnCancel: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: Theme.bgMuted,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  customBtnTextCancel: {
+    color: Theme.textSecondary,
+    fontSize: 16,
+    fontFamily: Fonts.bold,
+  },
+  customBtnAdd: {
+    flex: 1,
+    height: 54,
+    borderRadius: 16,
+    backgroundColor: Theme.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    ...Theme.shadowSm,
+  },
+  customBtnTextAdd: { color: "#fff", fontSize: 16, fontFamily: Fonts.black },
 });

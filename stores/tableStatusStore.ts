@@ -29,7 +29,7 @@ type TableStatusState = {
   lockTable: (tableId: string, lockedByName?: string) => void;
   unlockTable: (tableId: string) => void;
   isTableLocked: (tableId: string) => boolean;
-  getLockedName: (tableNo: string) => string | undefined;
+  getLockedName: (tableNo: string, section?: string) => string | undefined;
   setLockedName: (tableNo: string, name: string) => void;
   syncLockedTables: (lockedTables: Array<{ tableNo: string; section: string; lockedByName?: string }>) => void;
   getTables: () => TableStatus[];
@@ -124,8 +124,21 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
     return get().lockedTables.includes(tableId);
   },
 
-  getLockedName: (tableNo) => {
-    return get().lockedTableNames[tableNo];
+  getLockedName: (tableNo, section) => {
+    const normalize = (n: any) => n?.toString().replace(/^T/i, "").trim();
+    const sTableNo = normalize(tableNo);
+
+    if (section) {
+      const name = get().lockedTableNames[`${section}_${sTableNo}`] || get().lockedTableNames[`${section}_${tableNo}`];
+      if (name) return name;
+    }
+
+    // Fallback search in tables array
+    const table = get().tables.find(t => 
+      (normalize(t.tableNo) === sTableNo || t.tableNo === tableNo) && 
+      (!section || t.section === section)
+    );
+    return table?.lockedByName;
   },
 
   setLockedName: (tableNo, name) => {
@@ -138,12 +151,14 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
     set((state) => {
       const lockedMap: Record<string, { name: string; section: string }> = {};
       lockedList.forEach((t) => {
-        lockedMap[t.tableNo] = { name: t.lockedByName || "", section: t.section };
+        const key = `${t.section}_${t.tableNo}`;
+        lockedMap[key] = { name: t.lockedByName || "", section: t.section };
       });
 
       // 1. Update existing tables in state
       const updatedTables = state.tables.map((t) => {
-        const lockedData = lockedMap[t.tableNo];
+        const key = `${t.section}_${t.tableNo}`;
+        const lockedData = lockedMap[key];
         if (lockedData !== undefined) {
           return { ...t, status: "LOCKED" as TableStatusType, lockedByName: lockedData.name };
         } else if (t.status === "LOCKED") {
@@ -171,7 +186,10 @@ export const useTableStatusStore = create<TableStatusState>((set, get) => ({
       const finalTables = updatedTables.filter(t => t.status !== 'EMPTY');
 
       const nameMap: Record<string, string> = {};
-      lockedList.forEach(t => nameMap[t.tableNo] = t.lockedByName || "");
+      lockedList.forEach(t => {
+        const key = `${t.section}_${t.tableNo}`;
+        nameMap[key] = t.lockedByName || "";
+      });
 
       return {
         tables: finalTables,

@@ -1,18 +1,21 @@
-import { useRouter, useFocusEffect } from "expo-router";
-import React, { useState, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
+  KeyboardAvoidingView,
+  Platform,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
   useWindowDimensions,
+  View,
 } from "react-native";
 import { useToast } from "../../components/Toast";
-import { Theme } from "../../constants/theme";
 import { Fonts } from "../../constants/Fonts";
+import { Theme } from "../../constants/theme";
 
 export default function Index() {
   const [email, setEmail] = useState("");
@@ -23,13 +26,12 @@ export default function Index() {
   const router = useRouter();
   const { showToast } = useToast();
   const { width } = useWindowDimensions();
-  const containerWidth = Math.min(width - 40, 420);
 
   useFocusEffect(
     useCallback(() => {
       setEmail("");
       setPassword("");
-    }, [])
+    }, []),
   );
 
   const handleLogin = () => {
@@ -39,12 +41,17 @@ export default function Index() {
     const userPassword = "123";
 
     if (!email || !password) {
-      showToast({ type: "warning", message: "Fields Required", subtitle: "Please enter your email and password" });
+      showToast({
+        type: "warning",
+        message: "Fields Required",
+        subtitle: "Please enter your email and password",
+      });
       return;
     }
 
     const isAdmin = email === adminEmail && password === adminPassword;
-    const isUser = email.toLowerCase() === userEmail && password === userPassword;
+    const isUser =
+      email.toLowerCase() === userEmail && password === userPassword;
 
     if (isAdmin || isUser) {
       setEmail("");
@@ -53,224 +60,281 @@ export default function Index() {
       return;
     }
 
-    showToast({ type: "error", message: "Invalid Credentials", subtitle: "Email or password is incorrect" });
+    showToast({
+      type: "error",
+      message: "Invalid Credentials",
+      subtitle: "Email or password is incorrect",
+    });
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={Theme.bgMain} />
+    <View style={styles.container}>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
 
-      {/* Left decorative panel */}
-      <View style={styles.leftPanel}>
-        <View style={styles.brandCircle}>
-          <Text style={styles.brandEmoji}>☕</Text>
-        </View>
-        <Text style={styles.brandTagline}>Your Smart{"\n"}Café POS</Text>
-        <Text style={styles.brandSub}>Manage orders, tables &amp; sales{"\n"}all in one place.</Text>
+      {/* Abstract Orange Background */}
+      <View style={styles.abstractBg}>
+        <View style={styles.blob1} />
+        <View style={styles.blob2} />
+        <View style={styles.blob3} />
+      </View>
 
-        <View style={styles.featureList}>
-          {["🍽️  Fast order management", "📊  Real-time sales reports", "🔒  Secure table locking", "🧾  Built-in receipt printing"].map((f, i) => (
-            <View key={i} style={styles.featureItem}>
-              <Text style={styles.featureText}>{f}</Text>
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.keyboardView}
+        >
+          <View style={styles.centerWrap}>
+            <View style={styles.card}>
+              <View style={styles.logoContainer}>
+                <View style={styles.iconWrap}>
+                  <Text style={styles.brandEmoji}>☕</Text>
+                </View>
+                <Text style={styles.brandTitle}>Smart Café</Text>
+                <Text style={styles.brandSubtitle}>
+                  Manage Everything. Simply.
+                </Text>
+              </View>
+
+              <View style={styles.formContainer}>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>USERNAME / EMAIL</Text>
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      emailFocused && styles.inputWrapperFocused,
+                    ]}
+                  >
+                    <Ionicons
+                      name="person-outline"
+                      size={20}
+                      color={emailFocused ? Theme.primary : Theme.textMuted}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      placeholder="Enter your email"
+                      placeholderTextColor={Theme.textMuted}
+                      style={[
+                        styles.input,
+                        Platform.select({ web: { outlineStyle: "none" } }) as any,
+                      ]}
+                      value={email}
+                      onChangeText={setEmail}
+                      onFocus={() => setEmailFocused(true)}
+                      onBlur={() => setEmailFocused(false)}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>PASSWORD</Text>
+                  <View
+                    style={[
+                      styles.inputWrapper,
+                      passwordFocused && styles.inputWrapperFocused,
+                    ]}
+                  >
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={20}
+                      color={passwordFocused ? Theme.primary : Theme.textMuted}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      placeholder="Enter your password"
+                      placeholderTextColor={Theme.textMuted}
+                      secureTextEntry
+                      style={[
+                        styles.input,
+                        Platform.select({ web: { outlineStyle: "none" } }) as any,
+                      ]}
+                      value={password}
+                      onChangeText={setPassword}
+                      onFocus={() => setPasswordFocused(true)}
+                      onBlur={() => setPasswordFocused(false)}
+                    />
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.loginButton}
+                  onPress={handleLogin}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.loginText}>Sign In</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </TouchableOpacity>
+
+                <View style={styles.footerWrap}>
+                  <Text style={styles.footerNote}>
+                    © 2026 Unipro Softwares SG Pte Ltd. All Rights Reserved.
+                  </Text>
+                </View>
+              </View>
             </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Right login form */}
-      <View style={styles.rightPanel}>
-        <View style={[styles.loginBox, { width: containerWidth }]}>
-          {/* Logo mark */}
-          <View style={styles.logoMark}>
-            <Text style={styles.logoMarkText}>SC</Text>
           </View>
-
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to your POS account</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Username / Email</Text>
-            <TextInput
-              placeholder="Enter your email"
-              placeholderTextColor={Theme.textMuted}
-              style={[styles.input, emailFocused && styles.inputFocused]}
-              value={email}
-              onChangeText={setEmail}
-              onFocus={() => setEmailFocused(true)}
-              onBlur={() => setEmailFocused(false)}
-              autoCapitalize="none"
-              keyboardType="email-address"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Password</Text>
-            <TextInput
-              placeholder="Enter your password"
-              placeholderTextColor={Theme.textMuted}
-              secureTextEntry
-              style={[styles.input, passwordFocused && styles.inputFocused]}
-              value={password}
-              onChangeText={setPassword}
-              onFocus={() => setPasswordFocused(true)}
-              onBlur={() => setPasswordFocused(false)}
-            />
-          </View>
-
-          <TouchableOpacity style={styles.loginButton} onPress={handleLogin} activeOpacity={0.85}>
-            <Text style={styles.loginText}>Sign In</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.footerNote}>Smart Café POS · Secure Login</Text>
-        </View>
-      </View>
-    </SafeAreaView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: "row",
-    backgroundColor: Theme.bgMain,
-  },
-
-  /* ── Left Decorative Panel ── */
-  leftPanel: {
-    flex: 1,
     backgroundColor: Theme.primary,
-    padding: 40,
-    justifyContent: "center",
-    display: "flex",
   },
-  brandCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
+  abstractBg: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: "hidden",
   },
-  brandEmoji: { fontSize: 36 },
-  brandTagline: {
-    color: "#fff",
-    fontSize: 32,
-    fontFamily: Fonts.black,
-    lineHeight: 38,
-    marginBottom: 12,
+  blob1: {
+    position: "absolute",
+    width: 600,
+    height: 600,
+    borderRadius: 300,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    top: -200,
+    left: -200,
   },
-  brandSub: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 15,
-    fontFamily: Fonts.regular,
-    lineHeight: 22,
-    marginBottom: 36,
+  blob2: {
+    position: "absolute",
+    width: 800,
+    height: 800,
+    borderRadius: 400,
+    backgroundColor: "rgba(0,0,0,0.04)",
+    bottom: -300,
+    right: -200,
   },
-  featureList: { gap: 12 },
-  featureItem: {
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: Theme.radiusMd,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  blob3: {
+    position: "absolute",
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    top: "30%",
+    right: -100,
   },
-  featureText: {
-    color: "#fff",
-    fontFamily: Fonts.medium,
-    fontSize: 14,
+  safeArea: {
+    flex: 1,
   },
-
-  /* ── Right Login Panel ── */
-  rightPanel: {
+  keyboardView: {
+    flex: 1,
+  },
+  centerWrap: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Theme.bgMain,
-    padding: 30,
+    paddingHorizontal: 20,
   },
-  loginBox: {
-    backgroundColor: Theme.bgCard,
-    borderRadius: Theme.radiusXl,
-    padding: 36,
+  card: {
+    width: "100%",
+    maxWidth: 380,
+    borderRadius: 30,
+    padding: 32,
+    backgroundColor: "#ffffff",
+    ...Theme.shadowLg,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.5)",
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  iconWrap: {
+    width: 60,
+    height: 60,
+    borderRadius: 20,
+    backgroundColor: Theme.bgMain,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: Theme.border,
-    ...Theme.shadowLg,
   },
-  logoMark: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: Theme.primaryLight,
-    borderWidth: 1.5,
-    borderColor: Theme.primaryBorder,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
+  brandEmoji: {
+    fontSize: 28,
   },
-  logoMarkText: {
-    color: Theme.primary,
+  brandTitle: {
+    fontSize: 28,
     fontFamily: Fonts.black,
-    fontSize: 20,
-    letterSpacing: 1,
-  },
-  title: {
     color: Theme.textPrimary,
-    fontSize: 26,
-    fontFamily: Fonts.black,
-    marginBottom: 4,
+    letterSpacing: 0.5,
   },
-  subtitle: {
-    color: Theme.textSecondary,
+  brandSubtitle: {
     fontSize: 14,
-    fontFamily: Fonts.regular,
-    marginBottom: 28,
-  },
-
-  /* Inputs */
-  inputGroup: { marginBottom: 18 },
-  inputLabel: {
+    fontFamily: Fonts.medium,
     color: Theme.textSecondary,
-    fontFamily: Fonts.semiBold,
-    fontSize: 13,
-    marginBottom: 6,
+    marginTop: 6,
+  },
+  formContainer: {
+    width: "100%",
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontFamily: Fonts.bold,
+    color: Theme.textSecondary,
+    marginBottom: 8,
+    letterSpacing: 1,
+    paddingLeft: 4,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Theme.bgInput,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    height: 50,
+  },
+  inputWrapperFocused: {
+    backgroundColor: "#fff",
+    ...Theme.shadowSm,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    backgroundColor: Theme.bgInput,
+    flex: 1,
     color: Theme.textPrimary,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: Theme.radiusMd,
     fontSize: 15,
-    fontFamily: Fonts.regular,
-    borderWidth: 1.5,
-    borderColor: Theme.border,
+    fontFamily: Fonts.medium,
+    height: "100%",
   },
-  inputFocused: {
-    borderColor: Theme.primary,
-    backgroundColor: "#fff",
-  },
-
-  /* Login Button */
   loginButton: {
+    height: 50,
     backgroundColor: Theme.primary,
-    paddingVertical: 16,
-    borderRadius: Theme.radiusMd,
+    borderRadius: 14,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
-    ...Theme.shadowMd,
+    marginTop: 12,
+    gap: 8,
+    shadowColor: Theme.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
   },
   loginText: {
     color: "#fff",
     fontFamily: Fonts.black,
     fontSize: 16,
-    letterSpacing: 0.5,
   },
-
+  footerWrap: {
+    marginTop: 24,
+    alignItems: "center",
+  },
   footerNote: {
+    fontSize: 13,
+    fontFamily: "sherrif",
     color: Theme.textMuted,
-    fontSize: 12,
-    fontFamily: Fonts.regular,
-    textAlign: "center",
-    marginTop: 20,
   },
 });

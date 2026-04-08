@@ -90,7 +90,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
     return displayItems.reduce((sum, item) => sum + (item.price || 0) * item.qty, 0);
   }, [displayItems]);
 
-  const taxRate = 0.06; // Example 6% tax
+  const taxRate = 0; // Tax removed as per user request
   const taxAmount = subtotal * taxRate;
   const payableAmount = subtotal + taxAmount;
 
@@ -163,6 +163,17 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
                  </Text>
               </View>
             </View>
+
+            {/* MODIFIERS LIST - VERTICAL STACK */}
+            {item.modifiers && item.modifiers.length > 0 && (
+              <View style={styles.modifierListSmall}>
+                {item.modifiers.map((m: any, idx: number) => (
+                  <Text key={`${m.ModifierId}-${idx}`} style={styles.modifierTextSmall}>
+                    • {m.ModifierName}{m.Price > 0 ? ` (+$${m.Price.toFixed(2)})` : ""}
+                  </Text>
+                ))}
+              </View>
+            )}
             
             {/* INLINE QTY CONTROL ON MAIN ROW */}
             <View style={styles.inlineControls}>
@@ -243,11 +254,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
              {orderContext.orderType === "TAKEAWAY" ? `TAKEAWAY #${orderContext.takeawayNo}` : `${orderContext.section} - T${orderContext.tableNo}`}
            </Text>
         </View>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity style={styles.headerIconButton}><Ionicons name="add" size={20} color={Theme.textSecondary} /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><MaterialIcons name="grid-view" size={18} color={Theme.textSecondary} /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton} onPress={() => clearCart()}><Ionicons name="refresh" size={18} color={Theme.textSecondary} /></TouchableOpacity>
-        </View>
+
       </View>
 
       {/* ITEMS LIST */}
@@ -275,10 +282,6 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
            <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
               <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
-           </View>
-           <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax</Text>
-              <Text style={styles.summaryValue}>${taxAmount.toFixed(2)}</Text>
            </View>
            <View style={[styles.summaryRow, { marginTop: 8 }]}>
               <Text style={styles.payableLabel}>Payable Amount</Text>
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
   itemExpanded: { backgroundColor: Theme.bgMuted + "50", borderWidth: 1, borderColor: Theme.border },
   statusBar: { width: 4, height: "100%" },
   itemHeader: { flex: 1, flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 4 },
-  itemIndexWrap: { width: 34, flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 10 },
+  itemIndexWrap: { width: 42, flexDirection: "row", alignItems: "center", gap: 4, paddingLeft: 10, marginRight: 12 },
   chevron: { marginLeft: -4 },
   itemIndex: { fontSize: 13, fontFamily: Fonts.black, color: Theme.textPrimary },
   itemInfo: { flex: 1, paddingRight: 4 },
@@ -369,6 +372,8 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 13, fontFamily: Fonts.bold, color: Theme.textPrimary, flex: 1 },
   statusTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   statusTagText: { fontSize: 8, fontFamily: Fonts.extraBold },
+  modifierListSmall: { marginTop: 4, paddingLeft: 10, gap: 2, marginBottom: 2 },
+  modifierTextSmall: { fontSize: 10, fontFamily: Fonts.medium, color: Theme.textSecondary, lineHeight: 14 },
   inlineControls: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4 },
   sentQtyText: { fontSize: 13, fontFamily: Fonts.extraBold, color: Theme.textMuted, paddingLeft: 10 },
   qtyControlSmall: { flexDirection: "row", alignItems: "center", backgroundColor: Theme.bgMuted, borderRadius: 8, padding: 2 },
