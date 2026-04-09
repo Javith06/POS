@@ -34,8 +34,6 @@ const NavRail = () => {
   const router = useRouter();
   const navItems = [
     { id: "home", icon: "home-outline", label: "Home", active: true },
-    { id: "tables", icon: "grid-outline", label: "Tables" },
-    { id: "settings", icon: "settings-outline", label: "Settings" },
   ];
 
   return (
@@ -233,19 +231,12 @@ export default function MenuScreen() {
     });
   }, [searchText, items, allDishes]);
 
-  const openModifiers = async (dish: any, lineItemId: string) => {
+  const openModifiers = async (dish: any) => {
     setSelectedDish(dish);
-    setEditingLineItemId(lineItemId);
     setSelectedModifierIds([]);
     setCustomMods([]);
     setModifiers([]);
     setLoadingModifiers(true);
-    setShowModifier(true);
-
-    // Reset custom submodal
-    setShowCustomModal(false);
-    setCustomItemName("");
-    setCustomItemPrice("");
 
     try {
       const res = await fetch(`${API_URL}/modifiers/${dish.DishId}`);
@@ -254,17 +245,27 @@ export default function MenuScreen() {
 
       if (Array.isArray(data) && data.length > 0) {
         setModifiers(data);
+        setShowModifier(true);
       } else {
-        // No modifiers for this dish, auto-close the modal
+        // No modifiers for this dish, add to cart instantly
+        addToCartGlobal({
+          id: dish.DishId,
+          name: dish.Name,
+          price: dish.Price || 0,
+        });
         setModifiers([]);
         setShowModifier(false);
-        setEditingLineItemId(null);
       }
     } catch (err) {
       console.error(err);
+      // Fallback: add without modifiers if fetch fails
+      addToCartGlobal({
+        id: dish.DishId,
+        name: dish.Name,
+        price: dish.Price || 0,
+      });
       setModifiers([]);
       setShowModifier(false);
-      setEditingLineItemId(null);
     } finally {
       setLoadingModifiers(false);
     }
@@ -302,7 +303,7 @@ export default function MenuScreen() {
   };
 
   const addWithModifiers = () => {
-    if (editingLineItemId) {
+    if (selectedDish) {
       const allAvailable = [...modifiers, ...customMods];
       const selectedMods = allAvailable.filter((m) =>
         selectedModifierIds.includes(m.ModifierID),
@@ -314,13 +315,18 @@ export default function MenuScreen() {
         Price: m.Price || 0,
       }));
 
-      useCartStore.getState().updateCartItemModifiers(
-        editingLineItemId,
-        modsToAdd as any
-      );
+      const extra = modsToAdd.reduce((sum, m) => sum + (m.Price || 0), 0);
+      const finalPrice = (selectedDish.Price || 0) + extra;
+
+      addToCartGlobal({
+        id: selectedDish.DishId,
+        name: selectedDish.Name,
+        price: finalPrice,
+        modifiers: modsToAdd as any,
+        basePrice: selectedDish.Price || 0
+      });
     }
     setShowModifier(false);
-    setEditingLineItemId(null);
   };
 
   if (!orderContext)
@@ -467,12 +473,7 @@ export default function MenuScreen() {
                       width={cardWidth}
                       cartQty={cartQty}
                       onPress={() => {
-                        const lineId = addToCartGlobal({
-                          id: item.DishId,
-                          name: item.Name,
-                          price: item.Price || 0,
-                        });
-                        openModifiers(item, lineId);
+                        openModifiers(item);
                       }}
                     />
                   );

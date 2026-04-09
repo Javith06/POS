@@ -56,7 +56,7 @@ export default function PaymentScreen() {
   const [cashInput, setCashInput] = useState("");
   const [processing, setProcessing] = useState(false);
   const [time, setTime] = useState(new Date());
-  const { enabled: gstEnabled, percentage: gstPercentage, registrationNumber: gstRegNo, loadSettings: loadGst } = useGstStore();
+  const { enabled: gstEnabled, percentage: gstPercentage, registrationNumber: gstRegNo, taxMode, loadSettings: loadGst } = useGstStore();
 
   useEffect(() => {
     loadGst();
@@ -76,8 +76,18 @@ export default function PaymentScreen() {
   }, [discount, subtotal]);
 
   const discSubtotal = Math.max(0, subtotal - discountAmount);
-  const tax = gstEnabled ? parseFloat((discSubtotal * (gstPercentage / 100)).toFixed(2)) : 0;
-  const total = discSubtotal + tax;
+  
+  const tax = useMemo(() => {
+    if (!gstEnabled) return 0;
+    const rate = gstPercentage / 100;
+    if (taxMode === "inclusive") {
+      return parseFloat((discSubtotal - discSubtotal / (1 + rate)).toFixed(2));
+    }
+    return parseFloat((discSubtotal * rate).toFixed(2));
+  }, [gstEnabled, gstPercentage, taxMode, discSubtotal]);
+
+  const displaySubtotal = taxMode === "inclusive" ? subtotal - tax : subtotal;
+  const total = taxMode === "inclusive" ? discSubtotal : discSubtotal + tax;
 
   const paidNum = parseFloat(cashInput) || 0;
   const change = Math.max(0, paidNum - total);
@@ -217,7 +227,7 @@ export default function PaymentScreen() {
             <div class="divider"></div>
             ${itemsHtml}
             <div class="divider"></div>
-            <div class="flex-row"><span>Subtotal:</span><span>$${subtotal.toFixed(2)}</span></div>
+            <div class="flex-row"><span>Subtotal:</span><span>$${displaySubtotal.toFixed(2)}</span></div>
             ${discountAmount > 0 ? `<div class="flex-row"><span>Discount:</span><span>-$${discountAmount.toFixed(2)}</span></div>` : ''}
             ${gstEnabled ? `<div class="flex-row"><span>GST (${gstPercentage}%):</span><span>$${tax.toFixed(2)}</span></div>` : ''}
             <div class="flex-row bold" style="font-size: 14px; margin-top: 5px;"><span>TOTAL:</span><span>$${total.toFixed(2)}</span></div>
@@ -324,7 +334,7 @@ export default function PaymentScreen() {
             <View style={styles.breakdown}>
               <View style={styles.breakRow}>
                 <Text style={styles.breakLabel}>Subtotal</Text>
-                <Text style={styles.breakValue}>${subtotal.toFixed(2)}</Text>
+                <Text style={styles.breakValue}>${displaySubtotal.toFixed(2)}</Text>
               </View>
 
               {discount?.applied && (
@@ -370,7 +380,7 @@ export default function PaymentScreen() {
             {method === "CASH" && (
               <View style={styles.cashSection}>
                 <Text style={styles.sectionLabel}>Cash Received</Text>
-                <View style={[styles.cashInputBox, { borderColor: Theme.primary }]}>
+                <View style={styles.cashInputBox}>
                   <Text style={styles.currency}>$</Text>
                   <TextInput
                     style={styles.cashInput as any}
@@ -384,21 +394,30 @@ export default function PaymentScreen() {
                 </View>
 
                 <View style={styles.quickGrid}>
-                  {quickCash.map((v) => (
-                    <TouchableOpacity
-                      key={v}
-                      style={styles.quickBtn}
-                      onPress={() => setCashInput(v.toFixed(2))}
-                    >
-                      <Text style={styles.quickText}>${v}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity
-                    style={[styles.quickBtn, { backgroundColor: Theme.primaryLight, borderColor: Theme.primary }]}
-                    onPress={() => setCashInput(total.toFixed(2))}
-                  >
-                    <Text style={[styles.quickText, { color: Theme.primary }]}>Exact</Text>
-                  </TouchableOpacity>
+                  {quickCash.map((v) => {
+                    const isSelected = Math.abs(paidNum - v) < 0.01;
+                    return (
+                      <TouchableOpacity
+                        key={v}
+                        style={[styles.quickBtn, isSelected && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
+                        onPress={() => setCashInput(v.toFixed(2))}
+                      >
+                        <Text style={[styles.quickText, isSelected && { color: "#fff" }]}>${v}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  
+                  {(() => {
+                    const isExact = Math.abs(paidNum - total) < 0.01;
+                    return (
+                      <TouchableOpacity
+                        style={[styles.quickBtn, isExact && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
+                        onPress={() => setCashInput(total.toFixed(2))}
+                      >
+                        <Text style={[styles.quickText, isExact && { color: "#fff" }]}>Exact</Text>
+                      </TouchableOpacity>
+                    );
+                  })()}
                 </View>
 
                 <View style={styles.changeBox}>
@@ -619,7 +638,6 @@ const styles = StyleSheet.create({
     height: 56,
     paddingHorizontal: 15,
     marginBottom: 12,
-    borderWidth: 2,
     overflow: "hidden", // Prevent outline/input escape
   },
   currency: {

@@ -185,7 +185,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
                       style={styles.qtyBtnSmall} 
                       onPress={(e) => {
                         e.stopPropagation();
-                        updateCartItemQty(item.lineItemId, Math.max(1, item.qty - 1));
+                        updateCartItemQty(item.lineItemId, item.qty - 1);
                       }}
                     >
                       <Ionicons name="remove" size={14} color={Theme.textPrimary} />
@@ -269,14 +269,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
 
       {/* FOOTER AREA */}
       <View style={styles.footer}>
-        <View style={styles.addBar}>
-           <Text style={styles.addLabel}>Add</Text>
-           <View style={styles.addActions}>
-              <TouchableOpacity><Text style={styles.addBtnText}>Discount</Text></TouchableOpacity>
-              <TouchableOpacity><Text style={styles.addBtnText}>Coupon Code</Text></TouchableOpacity>
-              <TouchableOpacity><Text style={styles.addBtnText}>Note</Text></TouchableOpacity>
-           </View>
-        </View>
+
 
         <View style={styles.summary}>
            <View style={styles.summaryRow}>

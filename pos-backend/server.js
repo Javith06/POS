@@ -1260,12 +1260,22 @@ app.post("/api/attendance/track", async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const crypto = require("crypto");
+    const hash = crypto.createHash("md5").update(employeeId).digest("hex");
+    const formattedUUID = [
+      hash.substring(0, 8),
+      hash.substring(8, 12),
+      hash.substring(12, 16),
+      hash.substring(16, 20),
+      hash.substring(20, 32),
+    ].join("-");
+
     // Check if attendance record exists for today
     const result = await pool
       .request()
-      .input("EmployeeId", employeeId)
+      .input("EmployeeId", formattedUUID)
       .input("TodayDate", today).query(`
-        SELECT TOP 1 AttendanceId, StartDateTime, BreakInTime, BreakOutTime, EndDateTime
+        SELECT TOP 1 *
         FROM DailyAttendance
         WHERE DeliveryPersonId = @EmployeeId 
         AND CAST(CreatedOn AS DATE) = CAST(@TodayDate AS DATE)
@@ -1277,9 +1287,6 @@ app.post("/api/attendance/track", async (req, res) => {
     if (action === "START") {
       // Create new record or update START if not exists
       if (!existingRecord) {
-        // Convert employeeId string to a consistent UUID format
-        const crypto = require("crypto");
-        const hash = crypto.createHash("md5").update(employeeId).digest("hex");
         const formattedUUID = [
           hash.substring(0, 8),
           hash.substring(8, 12),
@@ -1323,17 +1330,6 @@ app.post("/api/attendance/track", async (req, res) => {
       if (existingRecord && !existingRecord.EndDateTime) {
         const startTime = new Date(existingRecord.StartDateTime);
         const totalHours = (currentTime - startTime) / (1000 * 60 * 60);
-
-        const crypto = require("crypto");
-        const hash = crypto.createHash("md5").update(employeeId).digest("hex");
-        const formattedUUID = [
-          hash.substring(0, 8),
-          hash.substring(8, 12),
-          hash.substring(12, 16),
-          hash.substring(16, 20),
-          hash.substring(20, 32),
-        ].join("-");
-
         const modifiedByUUID = userId || "00000000-0000-0000-0000-000000000000";
         const hours = Math.max(0, Math.round(totalHours * 100) / 100);
 
@@ -1374,13 +1370,21 @@ app.get("/api/attendance/today/:employeeId", async (req, res) => {
     const pool = await poolPromise;
     const { employeeId } = req.params;
 
+    const crypto = require("crypto");
+    const hash = crypto.createHash("md5").update(employeeId).digest("hex");
+    const formattedUUID = [
+      hash.substring(0, 8),
+      hash.substring(8, 12),
+      hash.substring(12, 16),
+      hash.substring(16, 20),
+      hash.substring(20, 32),
+    ].join("-");
+
     const result = await pool
       .request()
-      .input("EmployeeId", employeeId)
+      .input("EmployeeId", formattedUUID)
       .input("TodayDate", new Date()).query(`
-        SELECT TOP 1 
-          AttendanceId, DeliveryPersonId, EmployeeName, StartDateTime, 
-          BreakInTime, BreakOutTime, EndDateTime, NoofHours, CreatedOn
+        SELECT TOP 1 *
         FROM DailyAttendance
         WHERE DeliveryPersonId = @EmployeeId
         AND CAST(CreatedOn AS DATE) = CAST(@TodayDate AS DATE)

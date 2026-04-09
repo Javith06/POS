@@ -241,14 +241,74 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (!currentContextId) return;
 
     const currentCart = carts[currentContextId] || [];
-    const updatedCart = currentCart.map((item) => {
-      if (item.lineItemId === lineItemId) {
-        const base = item.basePrice || item.price || 0;
-        const extra = modifiers.reduce((sum, m) => sum + (m.Price || 0), 0);
-        return { ...item, modifiers, price: base + extra };
+    const sourceItem = currentCart.find((i) => i.lineItemId === lineItemId);
+    if (!sourceItem) return;
+
+    const areModifiersEqual = (mods1?: Modifier[], mods2?: Modifier[]) => {
+      const ids1 = (mods1 || []).map((m) => m.ModifierId).sort().join("|");
+      const ids2 = (mods2 || []).map((m) => m.ModifierId).sort().join("|");
+      return ids1 === ids2;
+    };
+
+    if (areModifiersEqual(sourceItem.modifiers, modifiers)) {
+      return; // No change in modifiers, early exit.
+    }
+
+    const base = sourceItem.basePrice || sourceItem.price || 0;
+    const extra = modifiers.reduce((sum, m) => sum + (m.Price || 0), 0);
+    const newPrice = base + extra;
+
+    // See if the new combo matches an EXISTING item (other than the temporary un-modified source item)
+    const matchingExistingItem = currentCart.find(
+      (p) =>
+        p.lineItemId !== lineItemId &&
+        p.id === sourceItem.id &&
+        p.spicy === sourceItem.spicy &&
+        p.oil === sourceItem.oil &&
+        p.salt === sourceItem.salt &&
+        p.sugar === sourceItem.sugar &&
+        p.note === sourceItem.note &&
+        areModifiersEqual(p.modifiers, modifiers)
+    );
+
+    let updatedCart = [...currentCart];
+
+    if (sourceItem.qty > 1) {
+      // Split the source item (drop 1 from group)
+      updatedCart = updatedCart.map((i) =>
+        i.lineItemId === lineItemId ? { ...i, qty: i.qty - 1 } : i
+      );
+
+      if (matchingExistingItem) {
+        // Merge the separated 1 qty into the matching existing item
+        updatedCart = updatedCart.map((i) =>
+          i.lineItemId === matchingExistingItem.lineItemId ? { ...i, qty: i.qty + 1 } : i
+        );
+      } else {
+        // Create a new independent item for the 1 qty
+        updatedCart.push({
+          ...sourceItem,
+          qty: 1,
+          lineItemId: uuidv4(),
+          modifiers,
+          price: newPrice,
+        });
       }
-      return item;
-    });
+    } else {
+      // Source item is single qty, so we alter it completely
+      if (matchingExistingItem) {
+        // It matches another existing item! Merge them, delete the source line.
+        updatedCart = updatedCart.filter((i) => i.lineItemId !== lineItemId);
+        updatedCart = updatedCart.map((i) =>
+          i.lineItemId === matchingExistingItem.lineItemId ? { ...i, qty: i.qty + 1 } : i
+        );
+      } else {
+        // Just modify it in place
+        updatedCart = updatedCart.map((i) =>
+          i.lineItemId === lineItemId ? { ...i, modifiers, price: newPrice } : i
+        );
+      }
+    }
 
     set({
       carts: {

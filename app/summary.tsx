@@ -45,7 +45,7 @@ export default function SummaryScreen() {
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   const [loadingReasons, setLoadingReasons] = useState(false);
 
-  const { enabled: gstEnabled, percentage: gstPercentage, isConfigured: gstConfigured, setEnabled: setGstEnabled, loadSettings: loadGst } = useGstStore();
+  const { enabled: gstEnabled, percentage: gstPercentage, taxMode, isConfigured: gstConfigured, setEnabled: setGstEnabled, loadSettings: loadGst } = useGstStore();
 
   useEffect(() => {
     loadGst();
@@ -157,8 +157,20 @@ export default function SummaryScreen() {
   }, [discountInfo, subtotal]);
 
   const discSubtotal = Math.max(0, subtotal - discountAmount);
-  const gstAmount = gstEnabled ? parseFloat((discSubtotal * (gstPercentage / 100)).toFixed(2)) : 0;
-  const grandTotal = discSubtotal + gstAmount;
+  
+  const gstAmount = useMemo(() => {
+    if (!gstEnabled) return 0;
+    const rate = gstPercentage / 100;
+    if (taxMode === "inclusive") {
+      // Extract tax from price: Total - (Total / (1 + rate))
+      return parseFloat((discSubtotal - discSubtotal / (1 + rate)).toFixed(2));
+    }
+    // Add tax on top
+    return parseFloat((discSubtotal * rate).toFixed(2));
+  }, [gstEnabled, gstPercentage, taxMode, discSubtotal]);
+
+  const displaySubtotal = taxMode === "inclusive" ? discSubtotal - gstAmount : subtotal;
+  const grandTotal = taxMode === "inclusive" ? discSubtotal : discSubtotal + gstAmount;
 
   if (!context) return null;
 
@@ -296,7 +308,7 @@ export default function SummaryScreen() {
 
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal</Text>
-                <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>${displaySubtotal.toFixed(2)}</Text>
               </View>
 
               {discountInfo?.applied && (
