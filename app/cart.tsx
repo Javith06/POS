@@ -175,13 +175,13 @@ export default function CartScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
+      <StatusBar barStyle="dark-content" backgroundColor={Theme.bgNav} />
       <View style={styles.container}>
         {/* TOP BAR */}
         <View style={styles.topBar}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="arrow-back" size={24} color="#f8fafc" />
+              <Ionicons name="arrow-back" size={24} color={Theme.textPrimary} />
             </TouchableOpacity>
             
             <View>
@@ -200,18 +200,18 @@ export default function CartScreen() {
 
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Pressable
-              style={[styles.topActionBtn, { backgroundColor: "rgba(239,68,68,0.15)", borderColor: "rgba(239,68,68,0.25)" }]}
+              style={[styles.topActionBtn, { backgroundColor: Theme.dangerBg, borderColor: Theme.dangerBorder, borderWidth: 1 }]}
               onPress={() => setShowCancelModal(true)}
             >
-              <Ionicons name="close-circle-outline" size={16} color="#fca5a5" />
-              <Text style={[styles.topBtnText, { color: "#fca5a5" }]}>Cancel</Text>
+              <Ionicons name="close-circle-outline" size={16} color={Theme.danger} />
+              <Text style={[styles.topBtnText, { color: Theme.danger }]}>Cancel</Text>
             </Pressable>
             <Pressable
-              style={[styles.topActionBtn, { backgroundColor: "rgba(255,255,255,0.07)", borderColor: "rgba(255,255,255,0.1)" }]}
+              style={[styles.topActionBtn, { backgroundColor: Theme.bgMuted, borderColor: Theme.border, borderWidth: 1 }]}
               onPress={() => clearCart()}
             >
-              <Ionicons name="trash-outline" size={16} color="#94a3b8" />
-              <Text style={[styles.topBtnText, { color: "#94a3b8" }]}>Clear</Text>
+              <Ionicons name="trash-outline" size={16} color={Theme.textSecondary} />
+              <Text style={[styles.topBtnText, { color: Theme.textSecondary }]}>Clear</Text>
             </Pressable>
           </View>
         </View>
@@ -236,7 +236,7 @@ export default function CartScreen() {
           renderItem={({ item }) => {
             if (!item) return null;
             const isSent = "status" in item && item.status === "SENT";
-            const borderColor = isSent ? "rgba(74,222,128,0.35)" : "#3b82f6";
+            const accentColor = isSent ? Theme.success : Theme.primary;
 
             return (
               <TouchableOpacity
@@ -250,7 +250,7 @@ export default function CartScreen() {
               >
                 <View style={[
                   styles.row,
-                  { borderLeftColor: borderColor, borderLeftWidth: 3 },
+                  { borderLeftColor: accentColor, borderLeftWidth: 4 },
                   isSent && { opacity: 0.65 },
                 ]}>
                   <View style={styles.itemInfo}>
@@ -261,12 +261,12 @@ export default function CartScreen() {
 
                       {isSent ? (
                         <View style={styles.badgeRow}>
-                          <Ionicons name="checkmark-circle" size={13} color="#4ade80" />
+                          <Ionicons name="checkmark-circle" size={13} color={Theme.success} />
                           <Text style={styles.sentBadgeText}>SENT</Text>
                         </View>
                       ) : (
                         <View style={styles.badgeRow}>
-                          <Ionicons name="ellipse" size={8} color="#60a5fa" />
+                          <Ionicons name="ellipse" size={8} color={Theme.primary} />
                           <Text style={styles.newBadgeText}>NEW</Text>
                         </View>
                       )}
@@ -298,17 +298,17 @@ export default function CartScreen() {
                         style={styles.actionBtn}
                         onPress={() => removeFromCartGlobal(item.lineItemId!)}
                       >
-                        <Ionicons name="remove" size={18} color="#f3f4f6" />
+                        <Ionicons name="remove" size={18} color={Theme.textPrimary} />
                       </Pressable>
 
                       <Pressable
-                        style={[styles.actionBtn, { backgroundColor: "rgba(34,197,94,0.15)" }]}
+                        style={[styles.actionBtn, { backgroundColor: Theme.successBg }]}
                         onPress={() => {
                           const { qty, lineItemId, ...rest } = item as CartItem;
                           addToCartGlobal(rest);
                         }}
                       >
-                        <Ionicons name="add" size={18} color="#4ade80" />
+                        <Ionicons name="add" size={18} color={Theme.success} />
                       </Pressable>
                     </View>
                   )}
@@ -328,7 +328,7 @@ export default function CartScreen() {
             {cart.length > 0 && (
               <>
                 <Pressable
-                  style={[styles.checkoutBtn, { backgroundColor: "#3b82f6" }]}
+                  style={[styles.checkoutBtn, { backgroundColor: Theme.info }]}
                   onPress={() => {
                     let targetOrderId = activeOrder?.orderId;
                     if (!targetOrderId) targetOrderId = getNextOrderId();
@@ -354,11 +354,11 @@ export default function CartScreen() {
                 </Pressable>
 
                 <Pressable
-                  style={[styles.checkoutBtn, { backgroundColor: "#22c55e" }]}
+                  style={[styles.checkoutBtn, { backgroundColor: Theme.primary }]}
                   onPress={sendOrder}
                 >
-                  <Ionicons name="send-outline" size={18} color="#052b12" />
-                  <Text style={[styles.checkoutBtnText, { color: "#052b12" }]}>Send</Text>
+                  <Ionicons name="send-outline" size={18} color="#fff" />
+                  <Text style={styles.checkoutBtnText}>Send</Text>
                 </Pressable>
               </>
             )}
@@ -367,7 +367,7 @@ export default function CartScreen() {
               <>
                 {(!currentTableData || currentTableData.status === 'SENT' || currentTableData.status === 'HOLD') ? (
                   <Pressable
-                    style={[styles.checkoutBtn, { backgroundColor: "#f59e0b" }]}
+                    style={[styles.checkoutBtn, { backgroundColor: Theme.warning }]}
                     onPress={() => {
                       if (orderContext.orderType === "DINE_IN") {
                         updateTableStatus(orderContext.section!, orderContext.tableNo!, activeOrder.orderId, 'BILL_REQUESTED', undefined, undefined, payableAmount);
@@ -382,7 +382,7 @@ export default function CartScreen() {
                   </Pressable>
                 ) : (
                   <Pressable
-                    style={[styles.checkoutBtn, { backgroundColor: "#0ea5e9" }]}
+                    style={[styles.checkoutBtn, { backgroundColor: Theme.primary }]}
                     onPress={() => router.push("/summary")}
                   >
                     <Ionicons name="arrow-forward-circle-outline" size={18} color="#fff" />
@@ -409,13 +409,13 @@ export default function CartScreen() {
               value={cancelPassword}
               onChangeText={setCancelPassword}
               placeholder="Admin Password"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={Theme.textMuted}
             />
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalBtnCancel} onPress={() => { setShowCancelModal(false); setCancelPassword(""); }}>
                 <Text style={styles.modalBtnTextCancel}>Back</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnConfirm} onPress={handleCancelOrder}>
+              <TouchableOpacity style={[styles.modalBtnConfirm, { backgroundColor: Theme.danger }]} onPress={handleCancelOrder}>
                 <Text style={styles.modalBtnTextConfirm}>Confirm</Text>
               </TouchableOpacity>
             </View>
@@ -430,10 +430,10 @@ export default function CartScreen() {
             <Text style={styles.modalTitle}>Editing {editingItem?.name}</Text>
             
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 15 }}>
-              <Text style={{ color: "#fff", fontSize: 16 }}>Quantity</Text>
+              <Text style={{ color: Theme.textPrimary, fontSize: 16 }}>Quantity</Text>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
                 <TouchableOpacity 
-                  style={[styles.minus, { width: 40, height: 40 }]} 
+                  style={styles.minus} 
                   onPress={() => {
                     if (editQty === 1) {
                       handleEditItemDelete();
@@ -442,13 +442,13 @@ export default function CartScreen() {
                     }
                   }}
                 >
-                  <Ionicons name="remove" size={20} color="#fff" />
+                  <Ionicons name="remove" size={20} color={Theme.textPrimary} />
                 </TouchableOpacity>
-                <Text style={{ color: "#fff", fontSize: 20, fontWeight: "bold", width: 30, textAlign: "center" }}>
+                <Text style={{ color: Theme.textPrimary, fontSize: 20, fontFamily: Fonts.bold, width: 30, textAlign: "center" }}>
                   {editQty}
                 </Text>
                 <TouchableOpacity 
-                  style={[styles.plus, { width: 40, height: 40 }]} 
+                  style={styles.plus} 
                   onPress={() => setEditQty(q => q + 1)}
                 >
                   <Ionicons name="add" size={20} color="#fff" />
@@ -456,29 +456,29 @@ export default function CartScreen() {
               </View>
             </View>
 
-            <Text style={{ color: "#9ca3af", fontSize: 14, marginTop: 10, marginBottom: 5 }}>Special Instructions:</Text>
+            <Text style={{ color: Theme.textMuted, fontSize: 14, marginTop: 10, marginBottom: 5 }}>Special Instructions:</Text>
             <TextInput
               style={[styles.modalInput, { marginBottom: 15 }]}
               value={editNote}
               onChangeText={setEditNote}
               placeholder="e.g. Less spicy, no onions"
-              placeholderTextColor="#6b7280"
+              placeholderTextColor={Theme.textMuted}
               multiline
             />
 
             <View style={styles.modalActions}>
               <TouchableOpacity 
-                style={[styles.modalBtnCancel, { backgroundColor: "rgba(239, 68, 68, 0.2)" }]} 
+                style={[styles.modalBtnCancel, { backgroundColor: Theme.dangerBg, borderColor: Theme.dangerBorder, borderWidth: 1 }]} 
                 onPress={handleEditItemDelete}
               >
-                <Text style={[styles.modalBtnTextCancel, { color: "#ef4444" }]}>Delete Item</Text>
+                <Text style={[styles.modalBtnTextCancel, { color: Theme.danger }]}>Delete Item</Text>
               </TouchableOpacity>
               
               <View style={{ flexDirection: "row", gap: 10 }}>
                 <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setEditingItem(null)}>
                   <Text style={styles.modalBtnTextCancel}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalBtnConfirm, { backgroundColor: "#3b82f6" }]} onPress={handleEditItemSave}>
+                <TouchableOpacity style={[styles.modalBtnConfirm, { backgroundColor: Theme.primary }]} onPress={handleEditItemSave}>
                   <Text style={styles.modalBtnTextConfirm}>Save</Text>
                 </TouchableOpacity>
               </View>
@@ -493,7 +493,7 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#0f172a", // Dark background to match sidebar
+    backgroundColor: Theme.bgMain,
   },
   container: { flex: 1, padding: 16 },
   topBar: {
@@ -501,15 +501,18 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: 'center',
     marginBottom: 20,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: Theme.bgCard,
     padding: 12,
-    borderRadius: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.border,
+    borderRadius: Theme.radiusLg,
+    ...Theme.shadowSm,
   },
   backBtn: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: Theme.radiusMd,
+    backgroundColor: Theme.bgMuted,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -519,155 +522,163 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: Theme.radiusSm,
     borderWidth: 1,
   },
   topBtnText: { fontFamily: Fonts.bold, fontSize: 13 },
-  contextText: { color: "#4ade80", fontSize: 15, fontFamily: Fonts.semiBold },
+  contextText: { color: Theme.primary, fontSize: 15, fontFamily: Fonts.bold },
   cartTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16, marginTop: 4 },
-  title: { color: "#f1f5f9", fontSize: 20, fontFamily: Fonts.black, letterSpacing: 1 },
+  title: { color: Theme.textPrimary, fontSize: 20, fontFamily: Fonts.black, letterSpacing: 1 },
   itemCountBadge: {
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: Theme.primaryLight,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  itemCountText: { color: "#94a3b8", fontFamily: Fonts.bold, fontSize: 13 },
-  emptyText: { color: "#6b7280", fontSize: 16, textAlign: "center", marginTop: 40, fontFamily: Fonts.medium },
+  itemCountText: { color: Theme.primary, fontFamily: Fonts.bold, fontSize: 13 },
+  emptyText: { color: Theme.textMuted, fontSize: 16, textAlign: "center", marginTop: 40, fontFamily: Fonts.medium },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingLeft: 16,
     paddingRight: 10,
-    borderBottomWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
-    borderLeftWidth: 3,
-    borderRadius: 4,
-    marginBottom: 8,
-    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: Theme.radiusLg,
+    marginBottom: 12,
+    backgroundColor: Theme.bgCard,
+    borderWidth: 1,
+    borderColor: Theme.border,
+    ...Theme.shadowMd,
   },
   itemInfo: { flex: 1, paddingRight: 8 },
-  name: { color: "#f3f4f6", fontFamily: Fonts.extraBold, fontSize: 16, flex: 1 },
-  sentName: { color: "#6b7280" },
+  name: { color: Theme.textPrimary, fontFamily: Fonts.extraBold, fontSize: 17, flex: 1 },
+  sentName: { color: Theme.textSecondary },
   badgeRow: { flexDirection: "row", alignItems: "center", marginLeft: 8 },
-  sentBadgeText: { color: "#4ade80", fontSize: 11, fontFamily: Fonts.extraBold, marginLeft: 3 },
-  newBadgeText: { color: "#93c5fd", fontSize: 11, fontFamily: Fonts.extraBold, marginLeft: 3 },
-  itemFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
-  qty: { color: "#94a3b8", fontSize: 14, fontFamily: Fonts.semiBold },
-  price: { color: "#22c55e", fontFamily: Fonts.black, fontSize: 16 },
+  sentBadgeText: { color: Theme.success, fontSize: 11, fontFamily: Fonts.extraBold, marginLeft: 3 },
+  newBadgeText: { color: Theme.primary, fontSize: 11, fontFamily: Fonts.extraBold, marginLeft: 3 },
+  itemFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  qty: { color: Theme.textSecondary, fontSize: 15, fontFamily: Fonts.semiBold },
+  price: { color: Theme.textPrimary, fontFamily: Fonts.black, fontSize: 18 },
   actionRow: { flexDirection: "row", gap: 12, alignItems: 'center' },
   actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: Theme.bgMuted,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: Theme.border,
   },
   bottomBlock: {
     position: "absolute",
     bottom: 0, left: 0, right: 0,
+    backgroundColor: Theme.bgMain,
     paddingVertical: 20,
     paddingHorizontal: 16,
-    backgroundColor: "#1e293b",
     borderTopWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderTopColor: Theme.border,
+    ...Theme.shadowLg,
   },
   subtotalCard: {
-    backgroundColor: "rgba(15,23,42,0.8)",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 12,
+    backgroundColor: Theme.bgCard,
+    borderRadius: Theme.radiusLg,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginBottom: 15,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: Theme.borderOrange,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    ...Theme.shadowSm,
   },
   subtotalLabel: {
-    color: "#64748b",
-    fontFamily: Fonts.semiBold,
-    fontSize: 12,
-    letterSpacing: 1,
+    color: Theme.textSecondary,
+    fontFamily: Fonts.black,
+    fontSize: 13,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
   },
   subtotalAmount: {
-    color: "#4ade80",
+    color: Theme.primary,
     fontFamily: Fonts.black,
-    fontSize: 24,
+    fontSize: 32,
   },
-  checkoutRow: { flexDirection: "row", gap: 10 },
+  checkoutRow: { flexDirection: "row", gap: 12 },
   checkoutBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 18,
+    borderRadius: Theme.radiusLg,
+    gap: 10,
+    ...Theme.shadowMd,
   },
-  checkoutBtnText: { color: "#fff", fontFamily: Fonts.black, fontSize: 16 },
+  checkoutBtnText: { color: "#fff", fontFamily: Fonts.black, fontSize: 18 },
   modifierContainer: {
-    marginTop: 6,
+    marginTop: 8,
     marginBottom: 6,
-    paddingLeft: 4,
+    backgroundColor: Theme.bgMuted,
+    padding: 8,
+    borderRadius: 8,
   },
   modifierText: {
-    color: "#9ca3af",
+    color: Theme.textSecondary,
     fontSize: 13,
-    fontFamily: Fonts.medium,
+    fontFamily: Fonts.bold,
     marginTop: 2,
   },
-  /* MODAL STYLES */
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
   modalContent: {
-    backgroundColor: "#1e293b",
+    backgroundColor: Theme.bgCard,
     padding: 24,
-    borderRadius: 16,
+    borderRadius: Theme.radiusXl,
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 360,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: Theme.border,
+    ...Theme.shadowLg,
   },
   modalContentEdit: {
-    backgroundColor: "#1e293b",
+    backgroundColor: Theme.bgCard,
     padding: 24,
-    borderRadius: 16,
+    borderRadius: Theme.radiusXl,
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: Theme.border,
+    ...Theme.shadowLg,
   },
   modalTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontFamily: Fonts.bold,
-    marginBottom: 8,
+    color: Theme.textPrimary,
+    fontSize: 22,
+    fontFamily: Fonts.black,
+    marginBottom: 10,
   },
   modalDesc: {
-    color: "#9ca3af",
+    color: Theme.textSecondary,
     fontSize: 14,
     marginBottom: 20,
-    fontFamily: Fonts.regular,
+    fontFamily: Fonts.medium,
   },
   modalInput: {
-    backgroundColor: "rgba(0,0,0,0.4)",
-    color: "#fff",
-    padding: 14,
-    borderRadius: 8,
+    backgroundColor: Theme.bgInput,
+    color: Theme.textPrimary,
+    padding: 16,
+    borderRadius: Theme.radiusMd,
     fontSize: 18,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-    marginBottom: 24,
-    fontFamily: Fonts.regular,
+    borderColor: Theme.border,
+    marginBottom: 20,
+    fontFamily: Fonts.bold,
   },
   modalActions: {
     flexDirection: "row",
@@ -675,35 +686,47 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   modalBtnCancel: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: Theme.radiusMd,
+    backgroundColor: Theme.bgMuted,
+    borderWidth: 1,
+    borderColor: Theme.border,
   },
   modalBtnTextCancel: {
-    color: "#fff",
-    fontFamily: Fonts.bold,
+    color: Theme.textSecondary,
+    fontFamily: Fonts.black,
+    fontSize: 14,
   },
   modalBtnConfirm: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: "#ef4444",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: Theme.radiusMd,
+    backgroundColor: Theme.primary,
+    ...Theme.shadowSm,
   },
   modalBtnTextConfirm: {
     color: "#fff",
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.black,
+    fontSize: 14,
   },
   minus: {
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    width: 44,
+    height: 44,
+    backgroundColor: Theme.bgMuted,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: Theme.radiusMd,
+    borderWidth: 1,
+    borderColor: Theme.border,
   },
   plus: {
-    backgroundColor: "rgba(59, 130, 246, 0.8)",
+    width: 44,
+    height: 44,
+    backgroundColor: Theme.primary,
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: Theme.radiusMd,
+    ...Theme.shadowSm,
   },
 });
