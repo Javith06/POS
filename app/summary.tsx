@@ -14,6 +14,10 @@ import {
   ScrollView,
   ActivityIndicator,
   StatusBar,
+  Platform,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "../constants/Fonts";
@@ -378,99 +382,102 @@ export default function SummaryScreen() {
 
       {/* CANCEL MODAL */}
       <Modal transparent visible={showCancelModal} animationType="fade">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Cancel Order?</Text>
-            <Text style={styles.modalDesc}>Please select a cancellation reason.</Text>
+              <Text style={styles.modalTitle}>Cancel Order?</Text>
+              <Text style={styles.modalDesc}>Please select a cancellation reason.</Text>
 
-            {loadingReasons ? (
-              <View style={{ paddingVertical: 40, alignItems: "center" }}>
-                <ActivityIndicator size="large" color={Theme.primary} />
-              </View>
-            ) : (
-              <ScrollView style={{ maxHeight: 250 }} showsVerticalScrollIndicator={false}>
-                {cancelReasons.map((reason) => (
+              {loadingReasons ? (
+                <View style={{ paddingVertical: 40, alignItems: "center" }}>
+                  <ActivityIndicator size="large" color={Theme.primary} />
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 250 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  {cancelReasons.map((reason) => (
+                    <TouchableOpacity
+                      key={reason.CRCode}
+                      style={[
+                        styles.reasonRow,
+                        selectedCancelReason === reason.CRName && styles.reasonRowSelected,
+                      ]}
+                      onPress={() => {
+                        setSelectedCancelReason(reason.CRName);
+                        setCustomCancelReason("");
+                      }}
+                    >
+                      <View style={[styles.reasonRadio, selectedCancelReason === reason.CRName && { borderColor: Theme.primary }]}>
+                        {selectedCancelReason === reason.CRName && (
+                          <View style={[styles.reasonRadioSelected, { backgroundColor: Theme.primary }]} />
+                        )}
+                      </View>
+                      <Text style={[styles.reasonName, selectedCancelReason === reason.CRName && { color: Theme.primary, fontFamily: Fonts.bold }]}>
+                        {reason.CRName}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+
                   <TouchableOpacity
-                    key={reason.CRCode}
                     style={[
                       styles.reasonRow,
-                      selectedCancelReason === reason.CRName && styles.reasonRowSelected,
+                      selectedCancelReason === "OTHER" && styles.reasonRowSelected,
                     ]}
-                    onPress={() => {
-                      setSelectedCancelReason(reason.CRName);
-                      setCustomCancelReason("");
-                    }}
+                    onPress={() => setSelectedCancelReason("OTHER")}
                   >
-                    <View style={[styles.reasonRadio, selectedCancelReason === reason.CRName && { borderColor: Theme.primary }]}>
-                      {selectedCancelReason === reason.CRName && (
+                    <View style={[styles.reasonRadio, selectedCancelReason === "OTHER" && { borderColor: Theme.primary }]}>
+                      {selectedCancelReason === "OTHER" && (
                         <View style={[styles.reasonRadioSelected, { backgroundColor: Theme.primary }]} />
                       )}
                     </View>
-                    <Text style={[styles.reasonName, selectedCancelReason === reason.CRName && { color: Theme.primary, fontFamily: Fonts.bold }]}>
-                      {reason.CRName}
+                    <Text style={[styles.reasonName, selectedCancelReason === "OTHER" && { color: Theme.primary, fontFamily: Fonts.bold }]}>
+                      Other (Custom)
                     </Text>
                   </TouchableOpacity>
-                ))}
 
+                  {selectedCancelReason === "OTHER" && (
+                    <TextInput
+                      style={styles.customReasonInput}
+                      placeholder="Enter cancellation reason..."
+                      placeholderTextColor={Theme.textMuted}
+                      value={customCancelReason}
+                      onChangeText={setCustomCancelReason}
+                      multiline
+                    />
+                  )}
+                </ScrollView>
+              )}
+
+              <View style={styles.modalActions}>
                 <TouchableOpacity
-                  style={[
-                    styles.reasonRow,
-                    selectedCancelReason === "OTHER" && styles.reasonRowSelected,
-                  ]}
-                  onPress={() => setSelectedCancelReason("OTHER")}
+                  style={styles.modalBtnCancel}
+                  onPress={() => {
+                    setShowCancelModal(false);
+                    setSelectedCancelReason(null);
+                    setCustomCancelReason("");
+                  }}
                 >
-                  <View style={[styles.reasonRadio, selectedCancelReason === "OTHER" && { borderColor: Theme.primary }]}>
-                    {selectedCancelReason === "OTHER" && (
-                      <View style={[styles.reasonRadioSelected, { backgroundColor: Theme.primary }]} />
-                    )}
-                  </View>
-                  <Text style={[styles.reasonName, selectedCancelReason === "OTHER" && { color: Theme.primary, fontFamily: Fonts.bold }]}>
-                    Other (Custom)
-                  </Text>
+                  <Text style={styles.modalBtnTextCancel}>Back</Text>
                 </TouchableOpacity>
-
-                {selectedCancelReason === "OTHER" && (
-                  <TextInput
-                    style={styles.customReasonInput}
-                    placeholder="Enter cancellation reason..."
-                    placeholderTextColor={Theme.textMuted}
-                    value={customCancelReason}
-                    onChangeText={setCustomCancelReason}
-                    multiline
-                  />
-                )}
-              </ScrollView>
-            )}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalBtnCancel}
-                onPress={() => {
-                  setShowCancelModal(false);
-                  setSelectedCancelReason(null);
-                  setCustomCancelReason("");
-                }}
-              >
-                <Text style={styles.modalBtnTextCancel}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalBtnConfirm, { backgroundColor: Theme.danger }]}
-                disabled={isCancellingOrder}
-                onPress={() => {
-                  if (!loadingReasons) {
-                    handleCancelOrder();
-                  }
-                }}
-              >
-                {isCancellingOrder ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnTextConfirm}>Confirm</Text>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtnConfirm, { backgroundColor: Theme.danger }]}
+                  disabled={isCancellingOrder}
+                  onPress={() => {
+                    if (!loadingReasons) {
+                      handleCancelOrder();
+                    }
+                  }}
+                >
+                  {isCancellingOrder ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.modalBtnTextConfirm}>Confirm</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

@@ -12,6 +12,9 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { useToast } from "../../components/Toast";
 import AbstractBackground from "../../components/ui/AbstractBackground";
@@ -26,7 +29,7 @@ export default function Index() {
 
   const router = useRouter();
   const { showToast } = useToast();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
 
   useFocusEffect(
     useCallback(() => {
@@ -68,6 +71,9 @@ export default function Index() {
     });
   };
 
+  const MobileTouchWrapper = Platform.OS === "web" ? React.Fragment : TouchableWithoutFeedback;
+  const wrapperProps = Platform.OS === "web" ? {} : { onPress: Keyboard.dismiss, accessible: false };
+
   return (
     <AbstractBackground>
       <StatusBar
@@ -78,100 +84,110 @@ export default function Index() {
 
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
           style={styles.keyboardView}
         >
-          <View style={styles.centerWrap}>
-            <View style={styles.card}>
-              <View style={styles.logoContainer}>
-                <View style={styles.iconWrap}>
-                  <Text style={styles.brandEmoji}>☕</Text>
-                </View>
-                <Text style={styles.brandTitle}>Smart Café</Text>
-                <Text style={styles.brandSubtitle}>
-                  Manage Everything. Simply.
-                </Text>
-              </View>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <MobileTouchWrapper {...wrapperProps}>
+                <View style={[styles.centerWrap, { minHeight: height - 100 }]}>
+                  <View style={styles.card}>
+                  <View style={styles.logoContainer}>
+                    <View style={styles.iconWrap}>
+                      <Text style={styles.brandEmoji}>☕</Text>
+                    </View>
+                    <Text style={styles.brandTitle}>Smart Café</Text>
 
-              <View style={styles.formContainer}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>USERNAME / EMAIL</Text>
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      emailFocused && styles.inputWrapperFocused,
-                    ]}
-                  >
-                    <Ionicons
-                      name="person-outline"
-                      size={20}
-                      color={emailFocused ? Theme.primary : Theme.textMuted}
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      placeholder="Enter your email"
-                      placeholderTextColor={Theme.textMuted}
-                      style={[
-                        styles.input,
-                        Platform.select({ web: { outlineStyle: "none" } }) as any,
-                      ]}
-                      value={email}
-                      onChangeText={setEmail}
-                      onFocus={() => setEmailFocused(true)}
-                      onBlur={() => setEmailFocused(false)}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                    />
+                    <Text style={styles.brandSubtitle}>
+                      Manage Everything. Simply.
+                    </Text>
+                  </View>
+
+                  <View style={styles.formContainer}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>USERNAME / EMAIL</Text>
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          emailFocused && styles.inputWrapperFocused,
+                        ]}
+                      >
+                        <Ionicons
+                          name="person-outline"
+                          size={20}
+                          color={emailFocused ? Theme.primary : Theme.textMuted}
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          placeholder="Enter your email"
+                          placeholderTextColor={Theme.textMuted}
+                          style={[
+                            styles.input,
+                            Platform.select({ web: { outlineStyle: "none" } }) as any,
+                          ]}
+                          value={email}
+                          onChangeText={setEmail}
+                          onFocus={() => setEmailFocused(true)}
+                          onBlur={() => setEmailFocused(false)}
+                          autoCapitalize="none"
+                          keyboardType="email-address"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>PASSWORD</Text>
+                      <View
+                        style={[
+                          styles.inputWrapper,
+                          passwordFocused && styles.inputWrapperFocused,
+                        ]}
+                      >
+                        <Ionicons
+                          name="lock-closed-outline"
+                          size={20}
+                          color={passwordFocused ? Theme.primary : Theme.textMuted}
+                          style={styles.inputIcon}
+                        />
+                        <TextInput
+                          placeholder="Enter your password"
+                          placeholderTextColor={Theme.textMuted}
+                          secureTextEntry
+                          style={[
+                            styles.input,
+                            Platform.select({ web: { outlineStyle: "none" } }) as any,
+                          ]}
+                          value={password}
+                          onChangeText={setPassword}
+                          onFocus={() => setPasswordFocused(true)}
+                          onBlur={() => setPasswordFocused(false)}
+                          onSubmitEditing={handleLogin}
+                        />
+                      </View>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.loginButton}
+                      onPress={handleLogin}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.loginText}>Sign In</Text>
+                      <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </TouchableOpacity>
+
+                    <View style={styles.footerWrap}>
+                      <Text style={styles.footerNote}>
+                        © 2026 Unipro Softwares SG Pte Ltd. All Rights Reserved.
+                      </Text>
+                    </View>
+                    </View>
                   </View>
                 </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>PASSWORD</Text>
-                  <View
-                    style={[
-                      styles.inputWrapper,
-                      passwordFocused && styles.inputWrapperFocused,
-                    ]}
-                  >
-                    <Ionicons
-                      name="lock-closed-outline"
-                      size={20}
-                      color={passwordFocused ? Theme.primary : Theme.textMuted}
-                      style={styles.inputIcon}
-                    />
-                    <TextInput
-                      placeholder="Enter your password"
-                      placeholderTextColor={Theme.textMuted}
-                      secureTextEntry
-                      style={[
-                        styles.input,
-                        Platform.select({ web: { outlineStyle: "none" } }) as any,
-                      ]}
-                      value={password}
-                      onChangeText={setPassword}
-                      onFocus={() => setPasswordFocused(true)}
-                      onBlur={() => setPasswordFocused(false)}
-                    />
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.loginButton}
-                  onPress={handleLogin}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.loginText}>Sign In</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-
-                <View style={styles.footerWrap}>
-                  <Text style={styles.footerNote}>
-                    © 2026 Unipro Softwares SG Pte Ltd. All Rights Reserved.
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
+              </MobileTouchWrapper>
+            </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </AbstractBackground>
@@ -185,11 +201,14 @@ const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
   centerWrap: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   card: {
     width: "100%",

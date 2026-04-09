@@ -11,6 +11,10 @@ import {
   TextInput,
   TouchableOpacity,
   StatusBar,
+  Platform,
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -24,6 +28,90 @@ import { useOrderContextStore } from "../stores/orderContextStore";
 import { getNextOrderId } from "../stores/orderIdStore";
 import { useTableStatusStore } from "../stores/tableStatusStore";
 import { holdOrder } from "../stores/heldOrdersStore";
+
+// --- MEMOIZED CART ITEM ---
+const CartItemRow = React.memo(({ 
+  item, 
+  onMinus, 
+  onPlus, 
+  onEdit 
+}: { 
+  item: any; 
+  onMinus: (id: string) => void; 
+  onPlus: (id: string) => void;
+  onEdit: (item: any) => void;
+}) => {
+  return (
+    <View style={styles.row}>
+      <View style={styles.itemInfo}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[styles.name, item.sent === 1 && styles.sentName]}>
+            {item.name}
+          </Text>
+          <View style={styles.badgeRow}>
+            {item.sent === 1 ? (
+              <>
+                <Ionicons name="checkmark-circle" size={14} color={Theme.success} />
+                <Text style={styles.sentBadgeText}>SENT</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="time" size={14} color={Theme.primary} />
+                <Text style={styles.newBadgeText}>NEW</Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        {item.modifiers && item.modifiers.length > 0 && (
+          <View style={styles.modifierContainer}>
+            <Text style={styles.modifierText}>
+              {item.modifiers.map((m: any) => m.ModifierName).join(", ")}
+            </Text>
+          </View>
+        )}
+
+        {item.notes ? (
+          <View style={[styles.modifierContainer, { backgroundColor: Theme.bgMain }]}>
+            <Text style={[styles.modifierText, { color: Theme.textPrimary }]}>
+              Note: {item.notes}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.itemFooter}>
+          <Text style={styles.qty}>Qty: {item.qty}</Text>
+          <Text style={styles.price}>
+            ${((item.price || 0) * item.qty).toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.actionRow}>
+        <TouchableOpacity
+          onPress={() => onMinus(item.id)}
+          style={styles.actionBtn}
+        >
+          <Ionicons name="remove" size={20} color={Theme.textPrimary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onPlus(item.id)}
+          style={[styles.actionBtn, { backgroundColor: Theme.primaryLight, borderColor: Theme.primaryBorder }]}
+        >
+          <Ionicons name="add" size={20} color={Theme.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onEdit(item)}
+          style={[styles.actionBtn, { backgroundColor: Theme.bgNav }]}
+        >
+          <Ionicons name="create-outline" size={20} color={Theme.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
 
 export default function CartScreen() {
   const router = useRouter();
@@ -127,6 +215,30 @@ export default function CartScreen() {
     router.replace("/(tabs)/category");
   };
 
+  const updateItemNotes = (contextId: string, lineItemId: string, notes: string) => {
+    const currentItems = carts[contextId] || [];
+    const updated = currentItems.map(i => i.lineItemId === lineItemId ? { ...i, notes } : i);
+    setCartItemsGlobal(contextId, updated);
+  };
+
+  const handlePlus = React.useCallback((lineItemId: string) => {
+    const item = cart.find(i => i.lineItemId === lineItemId);
+    if (item) {
+      const { qty, lineItemId: lid, ...rest } = item;
+      addToCartGlobal(rest);
+    }
+  }, [cart, addToCartGlobal]);
+
+  const handleMinus = React.useCallback((lineItemId: string) => {
+    removeFromCartGlobal(lineItemId);
+  }, [removeFromCartGlobal]);
+
+  const handleEdit = React.useCallback((item: any) => {
+    setEditingItem(item);
+    setEditQty(item.qty);
+    setEditNote(item.note || item.notes || "");
+  }, []);
+
   const handleEditItemSave = () => {
     if (!editingItem || !currentContextId) return;
     
@@ -172,6 +284,21 @@ export default function CartScreen() {
       router.replace("/(tabs)/category");
     }
   };
+
+  const renderCartItem = React.useCallback(
+    ({ item }: { item: any }) => {
+      if (!item) return null;
+      return (
+        <CartItemRow
+          item={item}
+          onPlus={handlePlus}
+          onMinus={handleMinus}
+          onEdit={handleEdit}
+        />
+      );
+    },
+    [handlePlus, handleMinus, handleEdit, cart],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -233,89 +360,7 @@ export default function CartScreen() {
           ListEmptyComponent={
             <Text style={styles.emptyText}>Cart is Empty</Text>
           }
-          renderItem={({ item }) => {
-            if (!item) return null;
-            const isSent = "status" in item && item.status === "SENT";
-            const accentColor = isSent ? Theme.success : Theme.primary;
-
-            return (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                disabled={isSent}
-                onPress={() => {
-                  setEditingItem(item as CartItem);
-                  setEditQty(item.qty);
-                  setEditNote(item.note || "");
-                }}
-              >
-                <View style={[
-                  styles.row,
-                  { borderLeftColor: accentColor, borderLeftWidth: 4 },
-                  isSent && { opacity: 0.65 },
-                ]}>
-                  <View style={styles.itemInfo}>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={[styles.name, isSent && styles.sentName]} numberOfLines={1}>
-                        {item.name}
-                      </Text>
-
-                      {isSent ? (
-                        <View style={styles.badgeRow}>
-                          <Ionicons name="checkmark-circle" size={13} color={Theme.success} />
-                          <Text style={styles.sentBadgeText}>SENT</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.badgeRow}>
-                          <Ionicons name="ellipse" size={8} color={Theme.primary} />
-                          <Text style={styles.newBadgeText}>NEW</Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* MODIFIERS */}
-                    <View style={styles.modifierContainer}>
-                      {item.spicy && item.spicy !== "Medium" && <Text style={styles.modifierText}>Spicy: {item.spicy}</Text>}
-                      {item.oil && item.oil !== "Normal" && <Text style={styles.modifierText}>Oil: {item.oil}</Text>}
-                      {item.salt && item.salt !== "Normal" && <Text style={styles.modifierText}>Salt: {item.salt}</Text>}
-                      {item.sugar && item.sugar !== "Normal" && <Text style={styles.modifierText}>Sugar: {item.sugar}</Text>}
-                      {item.note && <Text style={styles.modifierText}>📝 {item.note}</Text>}
-                      {item.modifiers && Array.isArray(item.modifiers) && item.modifiers.map((mod: any, idx: number) => (
-                        <Text key={`mod-${idx}`} style={styles.modifierText}>
-                          + {mod.ModifierName}{mod.Price ? ` ($${mod.Price.toFixed(2)})` : ""}
-                        </Text>
-                      ))}
-                    </View>
-
-                    <View style={styles.itemFooter}>
-                      <Text style={styles.qty}>×{item.qty}</Text>
-                      <Text style={styles.price}>${((item.price || 0) * item.qty).toFixed(2)}</Text>
-                    </View>
-                  </View>
-
-                  {!isSent && (
-                    <View style={styles.actionRow}>
-                      <Pressable
-                        style={styles.actionBtn}
-                        onPress={() => removeFromCartGlobal(item.lineItemId!)}
-                      >
-                        <Ionicons name="remove" size={18} color={Theme.textPrimary} />
-                      </Pressable>
-
-                      <Pressable
-                        style={[styles.actionBtn, { backgroundColor: Theme.successBg }]}
-                        onPress={() => {
-                          const { qty, lineItemId, ...rest } = item as CartItem;
-                          addToCartGlobal(rest);
-                        }}
-                      >
-                        <Ionicons name="add" size={18} color={Theme.success} />
-                      </Pressable>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+          renderItem={renderCartItem}
         />
 
         <View style={styles.bottomBlock}>
@@ -425,7 +470,10 @@ export default function CartScreen() {
 
       {/* EDIT ITEM MODAL */}
       <Modal transparent visible={!!editingItem} animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContentEdit}>
             <Text style={styles.modalTitle}>Editing {editingItem?.name}</Text>
             
@@ -484,8 +532,9 @@ export default function CartScreen() {
               </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
+
     </SafeAreaView>
   );
 }

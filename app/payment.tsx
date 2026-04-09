@@ -12,6 +12,10 @@ import {
   View,
   Platform,
   StatusBar,
+  KeyboardAvoidingView,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "../constants/Fonts";
@@ -325,149 +329,164 @@ export default function PaymentScreen() {
         </View>
 
         {/* MAIN */}
-        <View style={[styles.mainLayout, !showOrderPanel && styles.mobileLayout]}>
-          {/* LEFT: TOTALS */}
-          <View style={styles.leftPane}>
-            <Text style={styles.sectionLabel}>Amount Due</Text>
-            <Text style={styles.grandTotal}>${total.toFixed(2)}</Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView 
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={[styles.mainLayout, !showOrderPanel && styles.mobileLayout]}>
+                {/* LEFT: TOTALS */}
+                <View style={[styles.leftPane, !showOrderPanel && { flex: 0 }]}>
+                  <Text style={styles.sectionLabel}>Amount Due</Text>
+                  <Text style={styles.grandTotal}>${total.toFixed(2)}</Text>
 
-            <View style={styles.breakdown}>
-              <View style={styles.breakRow}>
-                <Text style={styles.breakLabel}>Subtotal</Text>
-                <Text style={styles.breakValue}>${displaySubtotal.toFixed(2)}</Text>
-              </View>
+                  <View style={styles.breakdown}>
+                    <View style={styles.breakRow}>
+                      <Text style={styles.breakLabel}>Subtotal</Text>
+                      <Text style={styles.breakValue}>${displaySubtotal.toFixed(2)}</Text>
+                    </View>
 
-              {discount?.applied && (
-                <View style={styles.breakRow}>
-                  <Text style={[styles.breakLabel, { color: Theme.danger }]}>Discount</Text>
-                  <Text style={[styles.breakValue, { color: Theme.danger }]}>-${discountAmount.toFixed(2)}</Text>
-                </View>
-              )}
+                    {discount?.applied && (
+                      <View style={styles.breakRow}>
+                        <Text style={[styles.breakLabel, { color: Theme.danger }]}>Discount</Text>
+                        <Text style={[styles.breakValue, { color: Theme.danger }]}>-${discountAmount.toFixed(2)}</Text>
+                      </View>
+                    )}
 
-              <View style={styles.breakRow}>
-                <Text style={styles.breakLabel}>GST ({gstPercentage}%)</Text>
-                <Text style={styles.breakValue}>${tax.toFixed(2)}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* CENTER: PAYMENT METHOD & CASH INPUT */}
-          <View style={styles.centerPane}>
-            <Text style={styles.sectionLabel}>Select Payment Method</Text>
-            <View style={styles.methodRow}>
-              {[
-                { id: "CASH", icon: "money-bill-wave" },
-                { id: "CARD", icon: "credit-card" },
-                { id: "NETS", icon: "exchange-alt" },
-                { id: "PAYNOW", icon: "qrcode" },
-              ].map((m) => (
-                <TouchableOpacity
-                  key={m.id}
-                  style={[styles.methodCard, method === m.id && styles.activeMethod]}
-                  onPress={() => setMethod(m.id)}
-                  activeOpacity={0.7}
-                >
-                  <FontAwesome5
-                    name={m.icon}
-                    size={24}
-                    color={method === m.id ? "#fff" : Theme.textMuted}
-                  />
-                  <Text style={[styles.methodText, method === m.id && { color: "#fff" }]}>{m.id}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {method === "CASH" && (
-              <View style={styles.cashSection}>
-                <Text style={styles.sectionLabel}>Cash Received</Text>
-                <View style={styles.cashInputBox}>
-                  <Text style={styles.currency}>$</Text>
-                  <TextInput
-                    style={styles.cashInput as any}
-                    keyboardType="numeric"
-                    value={cashInput}
-                    onChangeText={setCashInput}
-                    placeholder={`${total.toFixed(2)}`}
-                    placeholderTextColor={Theme.textMuted}
-                    autoFocus={!isMobile}
-                  />
+                    <View style={styles.breakRow}>
+                      <Text style={styles.breakLabel}>GST ({gstPercentage}%)</Text>
+                      <Text style={styles.breakValue}>${tax.toFixed(2)}</Text>
+                    </View>
+                  </View>
                 </View>
 
-                <View style={styles.quickGrid}>
-                  {quickCash.map((v) => {
-                    const isSelected = Math.abs(paidNum - v) < 0.01;
-                    return (
+                {/* CENTER: PAYMENT METHOD & CASH INPUT */}
+                <View style={styles.centerPane}>
+                  <Text style={styles.sectionLabel}>Select Payment Method</Text>
+                  <View style={styles.methodRow}>
+                    {[
+                      { id: "CASH", icon: "money-bill-wave" },
+                      { id: "CARD", icon: "credit-card" },
+                      { id: "NETS", icon: "exchange-alt" },
+                      { id: "PAYNOW", icon: "qrcode" },
+                    ].map((m) => (
                       <TouchableOpacity
-                        key={v}
-                        style={[styles.quickBtn, isSelected && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
-                        onPress={() => setCashInput(v.toFixed(2))}
+                        key={m.id}
+                        style={[styles.methodCard, method === m.id && styles.activeMethod]}
+                        onPress={() => setMethod(m.id)}
+                        activeOpacity={0.7}
                       >
-                        <Text style={[styles.quickText, isSelected && { color: "#fff" }]}>${v}</Text>
+                        <FontAwesome5
+                          name={m.icon}
+                          size={24}
+                          color={method === m.id ? "#fff" : Theme.textMuted}
+                        />
+                        <Text style={[styles.methodText, method === m.id && { color: "#fff" }]}>{m.id}</Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                  
-                  {(() => {
-                    const isExact = Math.abs(paidNum - total) < 0.01;
-                    return (
-                      <TouchableOpacity
-                        style={[styles.quickBtn, isExact && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
-                        onPress={() => setCashInput(total.toFixed(2))}
-                      >
-                        <Text style={[styles.quickText, isExact && { color: "#fff" }]}>Exact</Text>
-                      </TouchableOpacity>
-                    );
-                  })()}
+                    ))}
+                  </View>
+
+                  {method === "CASH" && (
+                    <View style={styles.cashSection}>
+                      <Text style={styles.sectionLabel}>Cash Received</Text>
+                      <View style={styles.cashInputBox}>
+                        <Text style={styles.currency}>$</Text>
+                        <TextInput
+                          style={styles.cashInput as any}
+                          keyboardType="numeric"
+                          value={cashInput}
+                          onChangeText={setCashInput}
+                          placeholder={`${total.toFixed(2)}`}
+                          placeholderTextColor={Theme.textMuted}
+                          autoFocus={!isMobile}
+                        />
+                      </View>
+
+                      <View style={styles.quickGrid}>
+                        {quickCash.map((v) => {
+                          const isSelected = Math.abs(paidNum - v) < 0.01;
+                          return (
+                            <TouchableOpacity
+                              key={v}
+                              style={[styles.quickBtn, isSelected && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
+                              onPress={() => setCashInput(v.toFixed(2))}
+                            >
+                              <Text style={[styles.quickText, isSelected && { color: "#fff" }]}>${v}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                        
+                        {(() => {
+                          const isExact = Math.abs(paidNum - total) < 0.01;
+                          return (
+                            <TouchableOpacity
+                              style={[styles.quickBtn, isExact && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
+                              onPress={() => setCashInput(total.toFixed(2))}
+                            >
+                              <Text style={[styles.quickText, isExact && { color: "#fff" }]}>Exact</Text>
+                            </TouchableOpacity>
+                          );
+                        })()}
+                      </View>
+
+                      <View style={styles.changeBox}>
+                        <Text style={styles.changeLabel}>Change to Return</Text>
+                        <Text style={styles.changeValue}>${change.toFixed(2)}</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.confirmBtn, method === "CASH" && paidNum < total && Math.abs(paidNum - total) > 0.01 && styles.disabled]}
+                    disabled={processing || (method === "CASH" && paidNum < total && Math.abs(paidNum - total) > 0.01)}
+                    onPress={confirmPayment}
+                    activeOpacity={0.8}
+                  >
+                    {processing ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                        <Text style={styles.confirmText}>Complete Settlement</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
                 </View>
 
-                <View style={styles.changeBox}>
-                  <Text style={styles.changeLabel}>Change to Return</Text>
-                  <Text style={styles.changeValue}>${change.toFixed(2)}</Text>
-                </View>
+                {/* RIGHT: ORDER SUMMARY (Tablet/Desktop) */}
+                {showOrderPanel && (
+                  <View style={styles.rightPane}>
+                    <View style={styles.summaryHeader}>
+                      <Ionicons name="list-outline" size={18} color={Theme.textSecondary} />
+                      <Text style={styles.receiptTitle}>Order Items</Text>
+                    </View>
+
+                    <FlatList
+                      data={cart}
+                      keyExtractor={(item, index) => index.toString()}
+                      renderItem={renderItem}
+                      showsVerticalScrollIndicator={false}
+                      style={styles.itemsList}
+                      scrollEnabled={false} // Container is already scrollable
+                    />
+
+                    <View style={styles.receiptDivider} />
+                    <View style={styles.receiptTotalRow}>
+                      <Text style={styles.receiptTotalLabel}>Total</Text>
+                      <Text style={styles.receiptTotalValue}>${total.toFixed(2)}</Text>
+                    </View>
+                  </View>
+                )}
               </View>
-            )}
+            </TouchableWithoutFeedback>
+          </ScrollView>
+        </KeyboardAvoidingView>
 
-            <TouchableOpacity
-              style={[styles.confirmBtn, method === "CASH" && paidNum < total && Math.abs(paidNum - total) > 0.01 && styles.disabled]}
-              disabled={processing || (method === "CASH" && paidNum < total && Math.abs(paidNum - total) > 0.01)}
-              onPress={confirmPayment}
-              activeOpacity={0.8}
-            >
-              {processing ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
-                  <Text style={styles.confirmText}>Complete Settlement</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {/* RIGHT: ORDER SUMMARY (Tablet/Desktop) */}
-          {showOrderPanel && (
-            <View style={styles.rightPane}>
-              <View style={styles.summaryHeader}>
-                <Ionicons name="list-outline" size={18} color={Theme.textSecondary} />
-                <Text style={styles.receiptTitle}>Order Items</Text>
-              </View>
-
-              <FlatList
-                data={cart}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={renderItem}
-                showsVerticalScrollIndicator={false}
-                style={styles.itemsList}
-              />
-
-              <View style={styles.receiptDivider} />
-              <View style={styles.receiptTotalRow}>
-                <Text style={styles.receiptTotalLabel}>Total</Text>
-                <Text style={styles.receiptTotalValue}>${total.toFixed(2)}</Text>
-              </View>
-            </View>
-          )}
-        </View>
       </View>
     </SafeAreaView>
   );

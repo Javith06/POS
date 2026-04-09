@@ -15,6 +15,8 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CartSidebar from "../../components/CartSidebar";
@@ -74,19 +76,19 @@ const NavRail = () => {
   );
 };
 
-const DishCard = ({
+const DishCard = React.memo(({
   dish,
   onPress,
   width,
   cartQty = 0,
 }: {
   dish: any;
-  onPress: () => void;
+  onPress: (dish: any) => void;
   width: number;
   cartQty?: number;
 }) => {
   return (
-    <TouchableOpacity style={[styles.card, { width }]} onPress={onPress}>
+    <TouchableOpacity style={[styles.card, { width }]} onPress={() => onPress(dish)}>
       {cartQty > 0 && (
         <View style={styles.qtyBadge}>
           <Text style={styles.qtyBadgeText}>{cartQty}</Text>
@@ -120,7 +122,7 @@ const DishCard = ({
       <Text style={styles.dishPrice}>${(dish.Price || 0).toFixed(2)}</Text>
     </TouchableOpacity>
   );
-};
+});
 
 // --- SCREEN ---
 
@@ -167,6 +169,8 @@ export default function MenuScreen() {
   const columns = isLarge ? 5 : isTablet ? 3 : 2;
   const gap = 15;
   const cardWidth = (mainWidth - 60 - gap * (columns - 1)) / columns;
+
+  const dismissKeyboard = () => Keyboard.dismiss();
 
   useEffect(() => {
     const newId = getContextId(orderContext);
@@ -231,7 +235,7 @@ export default function MenuScreen() {
     });
   }, [searchText, items, allDishes]);
 
-  const openModifiers = async (dish: any) => {
+  const openModifiers = React.useCallback(async (dish: any) => {
     setSelectedDish(dish);
     setSelectedModifierIds([]);
     setCustomMods([]);
@@ -247,7 +251,6 @@ export default function MenuScreen() {
         setModifiers(data);
         setShowModifier(true);
       } else {
-        // No modifiers for this dish, add to cart instantly
         addToCartGlobal({
           id: dish.DishId,
           name: dish.Name,
@@ -258,7 +261,6 @@ export default function MenuScreen() {
       }
     } catch (err) {
       console.error(err);
-      // Fallback: add without modifiers if fetch fails
       addToCartGlobal({
         id: dish.DishId,
         name: dish.Name,
@@ -269,7 +271,25 @@ export default function MenuScreen() {
     } finally {
       setLoadingModifiers(false);
     }
-  };
+  }, []);
+
+  const renderDishItem = React.useCallback(({ item }: { item: any }) => {
+    const ctxId = getContextId(orderContext);
+    const currentCart = ctxId ? (carts[ctxId] || []) : [];
+    
+    const cartQty = currentCart.reduce((acc: number, cartItem: any) => {
+      return cartItem.id === item.DishId ? acc + cartItem.qty : acc;
+    }, 0);
+
+    return (
+      <DishCard
+        dish={item}
+        width={cardWidth}
+        cartQty={cartQty}
+        onPress={openModifiers}
+      />
+    );
+  }, [orderContext, carts, cardWidth, openModifiers]);
 
   const toggleModifier = (mod: any) => {
     if (mod.ModifierName.toUpperCase() === "OPEN") {
@@ -460,24 +480,7 @@ export default function MenuScreen() {
                 keyExtractor={(item) => item.DishId}
                 numColumns={columns}
                 key={columns}
-                renderItem={({ item }) => {
-                  const ctxId = getContextId(orderContext);
-                  const currentCart = ctxId ? carts[ctxId] : [];
-                  const cartQty = currentCart?.reduce((acc, cartItem) => {
-                    return cartItem.id === item.DishId ? acc + cartItem.qty : acc;
-                  }, 0) || 0;
-
-                  return (
-                    <DishCard
-                      dish={item}
-                      width={cardWidth}
-                      cartQty={cartQty}
-                      onPress={() => {
-                        openModifiers(item);
-                      }}
-                    />
-                  );
-                }}
+                renderItem={renderDishItem}
                 columnWrapperStyle={{ gap: gap, marginBottom: gap }}
                 contentContainerStyle={styles.listPadding}
                 showsVerticalScrollIndicator={false}

@@ -28,6 +28,149 @@ import { getHeldOrders, removeHeldOrder } from "../../stores/heldOrdersStore";
 import { setOrderContext } from "../../stores/orderContextStore";
 import { useTableStatusStore } from "../../stores/tableStatusStore";
 
+// --- MEMOIZED TABLE COMPONENT ---
+const TableItemComponent = React.memo(({ 
+  item, 
+  itemSize, 
+  activeTab, 
+  tableData, 
+  onPress,
+  numberFont,
+  smallFont
+}: { 
+  item: TableItem; 
+  itemSize: number; 
+  activeTab: string;
+  tableData: any;
+  onPress: (item: TableItem, tableData: any) => void;
+  numberFont: number;
+  smallFont: number;
+}) => {
+  let borderColor = Theme.border;
+  let bgColor = Theme.bgCard;
+  let textColor = Theme.textPrimary;
+  let timeText = "";
+  let billAmount = (tableData?.billAmount || 0);
+  let statusLabel = "";
+  let statusColor = Theme.textMuted;
+
+  if (tableData) {
+    const elapsedMs = Date.now() - tableData.startTime;
+    const elapsedMinutes = Math.floor(elapsedMs / 60000);
+
+    switch (tableData.status) {
+      case "LOCKED":
+        bgColor = Theme.tableLocked.bg;
+        borderColor = Theme.tableLocked.border;
+        textColor = "#B91C1C";
+        statusLabel = "RESERVED";
+        statusColor = "#B91C1C";
+        break;
+      case "HOLD":
+        bgColor = Theme.tableHold.bg;
+        borderColor = Theme.tableHold.border;
+        textColor = "#1D4ED8";
+        statusLabel = "ON HOLD";
+        statusColor = "#1D4ED8";
+        break;
+      case "SENT":
+        if (elapsedMinutes >= 60) {
+          bgColor = Theme.tableSentOld.bg;
+          borderColor = Theme.tableSentOld.border;
+          textColor = "#B91C1C";
+          statusLabel = "OVERTIME";
+          statusColor = "#B91C1C";
+        } else {
+          bgColor = Theme.tableSent.bg;
+          borderColor = Theme.tableSent.border;
+          textColor = "#15803D";
+          statusLabel = "DINING";
+          statusColor = "#15803D";
+        }
+        break;
+      case "BILL_REQUESTED":
+        bgColor = Theme.tableBillRequest.bg;
+        borderColor = Theme.tableBillRequest.border;
+        textColor = "#B45309";
+        statusLabel = "CHECKOUT";
+        statusColor = "#B45309";
+        break;
+      default:
+        bgColor = Theme.tableEmpty.bg;
+        borderColor = Theme.tableEmpty.border;
+    }
+
+    const time = new Date(tableData.startTime);
+    const hours = time.getHours().toString().padStart(2, "0");
+    const mins = time.getMinutes().toString().padStart(2, "0");
+    if (tableData.status !== "LOCKED") {
+      timeText = `${hours}:${mins}`;
+    }
+  }
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      style={[
+        styles.tableBox,
+        {
+          width: itemSize,
+          height: itemSize,
+          borderColor,
+          backgroundColor: bgColor,
+        },
+      ]}
+      onPress={() => onPress(item, tableData)}
+    >
+      <View style={styles.tableContent}>
+        <Text style={[styles.tableNumber, { fontSize: numberFont, color: tableData ? textColor : Theme.textPrimary }]}>
+          {item.label}
+        </Text>
+
+        {tableData && tableData.status !== "LOCKED" && (
+          <View style={styles.tableInfo}>
+            {statusLabel ? (
+              <View style={[styles.statusChip, { backgroundColor: bgColor, borderColor }]}>
+                <Text style={[styles.statusChipText, { color: statusColor, fontSize: smallFont }]}>
+                  {statusLabel}
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.tableStats}>
+              <Text style={[styles.timeText, { fontSize: smallFont + 1, color: textColor }]}>
+                 <Ionicons name="time-outline" size={smallFont} color={textColor} /> {timeText}
+              </Text>
+              {billAmount > 0 && (
+                <Text style={[styles.billText, { fontSize: smallFont + 2, color: textColor, fontWeight: "800" }]}>
+                  ${billAmount.toFixed(2)}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {tableData && tableData.status === "LOCKED" && (
+          <View style={styles.lockedOverlay}>
+            <Ionicons name="lock-closed" size={Math.max(14, itemSize * 0.2)} color={Theme.danger} />
+            <Text style={[styles.timeText, { fontSize: smallFont, color: "#B91C1C", fontWeight: "bold" }]}>RESERVED</Text>
+            {tableData.lockedByName ? (
+              <View style={{ backgroundColor: "#B91C1C", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 }}>
+                <Text 
+                  style={[styles.lockedNameText, { fontSize: smallFont, color: "#FFF" }]} 
+                  numberOfLines={1} 
+                  ellipsizeMode="tail"
+                >
+                  {tableData.lockedByName}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 type TableItem = {
   id: string;
   label: string;
@@ -223,24 +366,54 @@ export default function Category() {
     return !!td;
   }).length;
 
-  const renderItem = ({ item }: { item: TableItem }) => {
-    const tableData = tables.find(
+  const handleTablePress = React.useCallback((item: TableItem, tableData: any) => {
+    if (tableData && tableData.status === "LOCKED") {
+      Alert.alert(
+        "Table Locked",
+        `Table ${item.label} is reserved. What would you like to do?`,
+        [
+          { text: "Unlock Table", style: "destructive", onPress: () => confirmUnlock(item.id, item.label) },
+          { text: "Go to Lock Tables", onPress: () => router.push("/locked-tables") },
+          { text: "Cancel", style: "cancel" },
+        ]
+      );
+      return;
+    }
+
+    let newContext: any;
+    if (activeTab === "TAKEAWAY") {
+      newContext = { orderType: "TAKEAWAY" as const, takeawayNo: item.label };
+    } else {
+      newContext = { orderType: "DINE_IN" as const, section: activeTab, tableNo: item.label };
+    }
+
+    setOrderContext(newContext);
+
+    if (tableData && tableData.status === "HOLD") {
+      const helds = getHeldOrders();
+      const held = helds.find((h) => h.orderId === tableData.orderId);
+      if (held) {
+        const contextId = getContextId(newContext);
+        if (contextId) setCartItemsGlobal(contextId, held.cart);
+        removeHeldOrder(held.id);
+      }
+    }
+
+    router.push("/menu/thai_kitchen");
+  }, [activeTab, router]);
+
+  const renderItem = React.useCallback(({ item }: { item: TableItem }) => {
+    const rawTableData = tables.find(
       (t) => t.section === activeTab && t.tableNo === item.label
     );
 
-    let borderColor = Theme.border;
-    let bgColor = Theme.bgCard;
-    let textColor = Theme.textPrimary;
-    let timeText = "";
-    let orderText = "";
-    let billAmount = 0;
-    let statusLabel = "";
-    let statusColor = Theme.textMuted;
-
-    if (tableData) {
-      if (tableData.status === "HOLD") {
+    // Prepare optimized data for memoized component
+    let tableData = null;
+    if (rawTableData) {
+      let billAmount = 0;
+      if (rawTableData.status === "HOLD") {
         const helds = getHeldOrders();
-        const held = helds.find((h) => h.orderId === tableData.orderId);
+        const held = helds.find((h) => h.orderId === rawTableData.orderId);
         if (held) {
           billAmount = held.cart.reduce(
             (sum: number, i: any) => sum + (i.price || 0) * i.qty,
@@ -249,15 +422,15 @@ export default function Category() {
         }
       } else {
         const activeOrder = activeOrders.find(
-          (o: any) => o.orderId === tableData.orderId
+          (o: any) => o.orderId === rawTableData.orderId
         );
         if (activeOrder) {
           billAmount = activeOrder.items.reduce(
             (sum: number, i: any) => sum + (i.price || 0) * i.qty,
             0
           );
-        } else if (tableData.totalAmount) {
-          billAmount = tableData.totalAmount;
+        } else if (rawTableData.totalAmount) {
+          billAmount = rawTableData.totalAmount;
         }
       }
 
@@ -275,159 +448,24 @@ export default function Category() {
         );
       }
 
-      const elapsedMs = Date.now() - tableData.startTime;
-      const elapsedMinutes = Math.floor(elapsedMs / 60000);
-
-      switch (tableData.status) {
-        case "LOCKED":
-          bgColor = Theme.tableLocked.bg;
-          borderColor = Theme.tableLocked.border;
-          textColor = "#B91C1C"; // Red
-          statusLabel = "RESERVED";
-          statusColor = "#B91C1C";
-          break;
-        case "HOLD":
-          bgColor = Theme.tableHold.bg;
-          borderColor = Theme.tableHold.border;
-          textColor = "#1D4ED8";
-          statusLabel = "ON HOLD";
-          statusColor = "#1D4ED8";
-          break;
-        case "SENT":
-          if (elapsedMinutes >= 60) {
-            bgColor = Theme.tableSentOld.bg;
-            borderColor = Theme.tableSentOld.border;
-            textColor = "#B91C1C";
-            statusLabel = "OVERTIME";
-            statusColor = "#B91C1C";
-          } else {
-            bgColor = Theme.tableSent.bg;
-            borderColor = Theme.tableSent.border;
-            textColor = "#15803D"; // Green
-            statusLabel = "DINING";
-            statusColor = "#15803D";
-          }
-          break;
-        case "BILL_REQUESTED":
-          bgColor = Theme.tableBillRequest.bg;
-          borderColor = Theme.tableBillRequest.border;
-          textColor = "#B45309"; // Amber
-          statusLabel = "CHECKOUT";
-          statusColor = "#B45309";
-          break;
-        default:
-          bgColor = Theme.tableEmpty.bg;
-          borderColor = Theme.tableEmpty.border;
-      }
-
-      const time = new Date(tableData.startTime);
-      const hours = time.getHours().toString().padStart(2, "0");
-      const mins = time.getMinutes().toString().padStart(2, "0");
-      if (tableData.status !== "LOCKED") {
-        timeText = `${hours}:${mins}`;
-        orderText = `#${tableData.orderId}`;
-      }
+      tableData = {
+        ...rawTableData,
+        billAmount
+      };
     }
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={[
-          styles.tableBox,
-          {
-            width: itemSize,
-            height: itemSize,
-            borderColor,
-            backgroundColor: bgColor,
-          },
-        ]}
-        onPress={() => {
-          if (tableData && tableData.status === "LOCKED") {
-            Alert.alert(
-              "Table Locked",
-              `Table ${item.label} is reserved. What would you like to do?`,
-              [
-                { text: "Unlock Table", style: "destructive", onPress: () => confirmUnlock(item.id, item.label) },
-                { text: "Go to Lock Tables", onPress: () => router.push("/locked-tables") },
-                { text: "Cancel", style: "cancel" },
-              ]
-            );
-            return;
-          }
-
-          let newContext: any;
-          if (activeTab === "TAKEAWAY") {
-            newContext = { orderType: "TAKEAWAY" as const, takeawayNo: item.label };
-          } else {
-            newContext = { orderType: "DINE_IN" as const, section: activeTab, tableNo: item.label };
-          }
-
-          setOrderContext(newContext);
-
-          if (tableData && tableData.status === "HOLD") {
-            const helds = getHeldOrders();
-            const held = helds.find((h) => h.orderId === tableData.orderId);
-            if (held) {
-              const contextId = getContextId(newContext);
-              if (contextId) setCartItemsGlobal(contextId, held.cart);
-              removeHeldOrder(held.id);
-            }
-          }
-
-          router.push("/menu/thai_kitchen");
-        }}
-      >
-        <View style={styles.tableContent}>
-          {/* Table number */}
-          <Text style={[styles.tableNumber, { fontSize: numberFont, color: tableData ? textColor : Theme.textPrimary }]}>
-            {item.label}
-          </Text>
-
-          {/* Active table info */}
-          {tableData && tableData.status !== "LOCKED" && (
-            <View style={styles.tableInfo}>
-              {statusLabel ? (
-                <View style={[styles.statusChip, { backgroundColor: bgColor, borderColor }]}>
-                  <Text style={[styles.statusChipText, { color: statusColor, fontSize: smallFont }]}>
-                    {statusLabel}
-                  </Text>
-                </View>
-              ) : null}
-              <View style={styles.tableStats}>
-                <Text style={[styles.timeText, { fontSize: smallFont + 1, color: textColor }]}>
-                   <Ionicons name="time-outline" size={smallFont} color={textColor} /> {timeText}
-                </Text>
-                {billAmount > 0 && (
-                  <Text style={[styles.billText, { fontSize: smallFont + 2, color: textColor, fontWeight: "800" }]}>
-                    ${billAmount.toFixed(2)}
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* Locked */}
-          {tableData && tableData.status === "LOCKED" && (
-            <View style={styles.lockedOverlay} onLayout={() => console.log(`Table ${item.label} locked name: "${tableData.lockedByName}"`)}>
-              <Ionicons name="lock-closed" size={Math.max(14, itemSize * 0.2)} color={Theme.danger} />
-              <Text style={[styles.timeText, { fontSize: smallFont, color: "#B91C1C", fontWeight: "bold" }]}>RESERVED</Text>
-              {tableData.lockedByName ? (
-                <View style={{ backgroundColor: "#B91C1C", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 }}>
-                  <Text 
-                    style={[styles.lockedNameText, { fontSize: smallFont, color: "#FFF" }]} 
-                    numberOfLines={1} 
-                    ellipsizeMode="tail"
-                  >
-                    {tableData.lockedByName}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
+      <TableItemComponent
+        item={item}
+        itemSize={itemSize}
+        activeTab={activeTab}
+        tableData={tableData}
+        onPress={handleTablePress}
+        numberFont={numberFont}
+        smallFont={smallFont}
+      />
     );
-  };
+  }, [activeTab, tables, activeOrders, carts, itemSize, numberFont, smallFont, handleTablePress]);
 
   if (loading) {
     return (
