@@ -1,318 +1,204 @@
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
+  Animated,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
-  ScrollView,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
-import { useToast } from "../../components/Toast";
-import AbstractBackground from "../../components/ui/AbstractBackground";
 import { Fonts } from "../../constants/Fonts";
 import { Theme } from "../../constants/theme";
 
 export default function Index() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [emailFocused, setEmailFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   const router = useRouter();
-  const { showToast } = useToast();
-  const { width, height } = useWindowDimensions();
 
   useFocusEffect(
     useCallback(() => {
-      setEmail("");
-      setPassword("");
-    }, []),
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [fadeAnim, slideAnim]),
   );
 
   const handleLogin = () => {
-    const adminEmail = "unipro@gmail.com";
-    const adminPassword = "786";
-    const userEmail = "user123";
-    const userPassword = "123";
-
-    if (!email || !password) {
-      showToast({
-        type: "warning",
-        message: "Fields Required",
-        subtitle: "Please enter your email and password",
-      });
-      return;
-    }
-
-    const isAdmin = email === adminEmail && password === adminPassword;
-    const isUser =
-      email.toLowerCase() === userEmail && password === userPassword;
-
-    if (isAdmin || isUser) {
-      setEmail("");
-      setPassword("");
-      router.replace("/(tabs)/category");
-      return;
-    }
-
-    showToast({
-      type: "error",
-      message: "Invalid Credentials",
-      subtitle: "Email or password is incorrect",
-    });
+    router.replace("/(tabs)/category");
   };
 
-  const MobileTouchWrapper = Platform.OS === "web" ? React.Fragment : TouchableWithoutFeedback;
-  const wrapperProps = Platform.OS === "web" ? {} : { onPress: Keyboard.dismiss, accessible: false };
-
   return (
-    <AbstractBackground>
-      <StatusBar
-        barStyle="light-content"
-        translucent
-        backgroundColor="transparent"
-      />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+
+      {/* Background Layer */}
+      <LinearGradient
+        colors={[Theme.primary, "#1A1A1A"]}
+        style={StyleSheet.absoluteFill}
+      >
+        <View style={[styles.bgCircle, styles.bgCircle1]} />
+        <View style={[styles.bgCircle, styles.bgCircle2]} />
+      </LinearGradient>
 
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.keyboardView}
-        >
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <MobileTouchWrapper {...wrapperProps}>
-                <View style={[styles.centerWrap, { minHeight: height - 100 }]}>
-                  <View style={styles.card}>
-                  <View style={styles.logoContainer}>
-                    <View style={styles.iconWrap}>
-                      <Text style={styles.brandEmoji}>☕</Text>
-                    </View>
-                    <Text style={styles.brandTitle}>Smart Café</Text>
-
-                    <Text style={styles.brandSubtitle}>
-                      Manage Everything. Simply.
-                    </Text>
-                  </View>
-
-                  <View style={styles.formContainer}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>USERNAME / EMAIL</Text>
-                      <View
-                        style={[
-                          styles.inputWrapper,
-                          emailFocused && styles.inputWrapperFocused,
-                        ]}
-                      >
-                        <Ionicons
-                          name="person-outline"
-                          size={20}
-                          color={emailFocused ? Theme.primary : Theme.textMuted}
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          placeholder="Enter your email"
-                          placeholderTextColor={Theme.textMuted}
-                          style={[
-                            styles.input,
-                            Platform.select({ web: { outlineStyle: "none" } }) as any,
-                          ]}
-                          value={email}
-                          onChangeText={setEmail}
-                          onFocus={() => setEmailFocused(true)}
-                          onBlur={() => setEmailFocused(false)}
-                          autoCapitalize="none"
-                          keyboardType="email-address"
-                        />
-                      </View>
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>PASSWORD</Text>
-                      <View
-                        style={[
-                          styles.inputWrapper,
-                          passwordFocused && styles.inputWrapperFocused,
-                        ]}
-                      >
-                        <Ionicons
-                          name="lock-closed-outline"
-                          size={20}
-                          color={passwordFocused ? Theme.primary : Theme.textMuted}
-                          style={styles.inputIcon}
-                        />
-                        <TextInput
-                          placeholder="Enter your password"
-                          placeholderTextColor={Theme.textMuted}
-                          secureTextEntry
-                          style={[
-                            styles.input,
-                            Platform.select({ web: { outlineStyle: "none" } }) as any,
-                          ]}
-                          value={password}
-                          onChangeText={setPassword}
-                          onFocus={() => setPasswordFocused(true)}
-                          onBlur={() => setPasswordFocused(false)}
-                          onSubmitEditing={handleLogin}
-                        />
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.loginButton}
-                      onPress={handleLogin}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.loginText}>Sign In</Text>
-                      <Ionicons name="arrow-forward" size={20} color="#fff" />
-                    </TouchableOpacity>
-
-                    <View style={styles.footerWrap}>
-                      <Text style={styles.footerNote}>
-                        © 2026 Unipro Softwares SG Pte Ltd. All Rights Reserved.
-                      </Text>
-                    </View>
-                    </View>
-                  </View>
+        <View style={styles.centeredContent}>
+          <Animated.View
+            style={[
+              styles.content,
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+            ]}
+          >
+            <View style={styles.card}>
+              <View style={styles.header}>
+                <View style={styles.logoBadge}>
+                  <Ionicons
+                    name="restaurant"
+                    size={48}
+                    color={Theme.primary}
+                  />
                 </View>
-              </MobileTouchWrapper>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                <Text style={styles.title}>Smart Cafe POS</Text>
+                <Text style={styles.subtitle}>
+                  Press below to start your session
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.button}
+                onPress={handleLogin}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.buttonText}>Enter POS</Text>
+                <Ionicons name="chevron-forward" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              {/* Copyright */}
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                  © 2026 Unipro Softwares SG Pte Ltd
+                </Text>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
       </SafeAreaView>
-    </AbstractBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Theme.primary,
+  },
   safeArea: {
     flex: 1,
   },
-  keyboardView: {
+  centeredContent: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  centerWrap: {
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingHorizontal: 24,
+  },
+  content: {
+    width: "100%",
+    maxWidth: 420,
+    alignItems: "center",
+  },
+  bgCircle: {
+    position: "absolute",
+    borderRadius: 999,
+  },
+  bgCircle1: {
+    width: 300,
+    height: 300,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    top: -50,
+    left: -50,
+  },
+  bgCircle2: {
+    width: 400,
+    height: 400,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    bottom: -100,
+    right: -80,
   },
   card: {
     width: "100%",
-    maxWidth: 380,
-    borderRadius: 30,
-    padding: 32,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#fff",
+    borderRadius: 32,
+    padding: 40,
     ...Theme.shadowLg,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.5)",
-  },
-  logoContainer: {
     alignItems: "center",
-    marginBottom: 32,
   },
-  iconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
+  header: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  logoBadge: {
+    width: 100,
+    height: 100,
+    borderRadius: 30,
     backgroundColor: Theme.bgMain,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: Theme.border,
   },
-  brandEmoji: {
-    fontSize: 28,
-  },
-  brandTitle: {
-    fontSize: 28,
+  title: {
+    fontSize: 32,
     fontFamily: Fonts.black,
     color: Theme.textPrimary,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
-  brandSubtitle: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 16,
     fontFamily: Fonts.medium,
     color: Theme.textSecondary,
-    marginTop: 6,
+    marginTop: 10,
+    textAlign: "center",
   },
-  formContainer: {
+  button: {
     width: "100%",
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontFamily: Fonts.bold,
-    color: Theme.textSecondary,
-    marginBottom: 8,
-    letterSpacing: 1,
-    paddingLeft: 4,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Theme.bgInput,
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    height: 50,
-  },
-  inputWrapperFocused: {
-    backgroundColor: "#fff",
-    ...Theme.shadowSm,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    color: Theme.textPrimary,
-    fontSize: 15,
-    fontFamily: Fonts.medium,
-    height: "100%",
-  },
-  loginButton: {
-    height: 50,
+    height: 64,
     backgroundColor: Theme.primary,
-    borderRadius: 14,
+    borderRadius: 20,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 12,
-    gap: 8,
+    marginTop: 10,
+    gap: 12,
+    ...Theme.shadowMd,
     shadowColor: Theme.primary,
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
   },
-  loginText: {
+  buttonText: {
     color: "#fff",
+    fontSize: 20,
     fontFamily: Fonts.black,
-    fontSize: 16,
   },
-  footerWrap: {
-    marginTop: 24,
+  footer: {
+    marginTop: 60,
     alignItems: "center",
   },
-  footerNote: {
-    fontSize: 13,
-    fontFamily: "sherrif",
+  footerText: {
+    fontSize: 12,
+    fontFamily: Fonts.medium,
     color: Theme.textMuted,
+    opacity: 0.8,
   },
 });
