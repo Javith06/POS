@@ -164,10 +164,10 @@ export default function MenuScreen() {
   const isTabletPortrait = width >= 600 && width <= 900;
   const isLarge = width >= 600; // Cart visible for both tablet and desktop
 
-  const cartWidth = isLandscape ? 350 : (isTabletPortrait ? 300 : 0);
+  const cartWidth = isLandscape ? 380 : (isTabletPortrait ? 330 : 0);
   const mainWidth = width - cartWidth;
 
-  const columns = isLandscape ? 6 : (isTabletPortrait ? 2 : 2);
+  const columns = isLandscape ? 4 : (isTabletPortrait ? 2 : 2);
   const gap = 15;
   const cardWidth = (mainWidth - 60 - gap * (columns - 1)) / columns;
 
@@ -350,6 +350,109 @@ export default function MenuScreen() {
     setShowModifier(false);
   };
 
+  const renderTopBar = () => (
+    <View style={styles.topBar}>
+      <TouchableOpacity
+        onPress={() => router.replace("/(tabs)/category")}
+        style={styles.backBtn}
+      >
+        <Ionicons name="arrow-back" size={24} color={Theme.textPrimary} />
+      </TouchableOpacity>
+      <View style={styles.searchWrap}>
+        <Ionicons
+          name="search"
+          size={20}
+          color={Theme.textMuted}
+          style={styles.searchIcon}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search products....."
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+        {searchText.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchText("")}>
+            <Ionicons
+              name="close-circle"
+              size={18}
+              color={Theme.textMuted}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+      <View style={styles.topActions}>
+        {!isLarge && (
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: Theme.success }]}
+            onPress={() => router.push("/cart")}
+          >
+            <Ionicons name="cart" size={18} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderCategoryNav = () => (
+    <View style={styles.categoryNavigation}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.catScroll}
+      >
+        {kitchens.map((k) => (
+          <TouchableOpacity
+            key={k.CategoryId}
+            style={[
+              styles.catPill,
+              selectedKitchenId === k.CategoryId && styles.catPillActive,
+            ]}
+            onPress={() => loadGroups(k.CategoryId)}
+          >
+            <Text
+              style={[
+                styles.catText,
+                selectedKitchenId === k.CategoryId && styles.catTextActive,
+              ]}
+            >
+              {k.KitchenTypeName}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <View style={{ marginTop: 10 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.groupScroll}
+        >
+          {groups.map((g) => (
+            <TouchableOpacity
+              key={g.DishGroupId}
+              style={[
+                styles.groupPill,
+                selectedGroup === g.DishGroupId && styles.groupPillActive,
+              ]}
+              onPress={() => loadDishes(g.DishGroupId)}
+            >
+              <Text
+                style={[
+                  styles.groupText,
+                  selectedGroup === g.DishGroupId &&
+                    styles.groupTextActive,
+                ]}
+              >
+                {g.DishGroupName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </View>
+  );
+
   if (!orderContext)
     return (
       <SafeAreaView style={styles.centered}>
@@ -360,137 +463,63 @@ export default function MenuScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.layout}>
-        {/* LEFT NAV RAIL REMOVED */}
-
-        {/* MAIN CONTENT */}
-        <View style={[styles.main, { width: mainWidth }]}>
-          {/* TOP BAR */}
-          <View style={styles.topBar}>
-            <TouchableOpacity
-              onPress={() => router.replace("/(tabs)/category")}
-              style={styles.backBtn}
-            >
-              <Ionicons name="arrow-back" size={24} color={Theme.textPrimary} />
-            </TouchableOpacity>
-            <View style={styles.searchWrap}>
-              <Ionicons
-                name="search"
-                size={20}
-                color={Theme.textMuted}
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search products....."
-                value={searchText}
-                onChangeText={setSearchText}
-              />
-              {searchText.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchText("")}>
-                  <Ionicons
-                    name="close-circle"
-                    size={18}
-                    color={Theme.textMuted}
+      <View style={{ flex: 1 }}>
+        {isLandscape ? (
+          <View style={styles.layout}>
+            {/* DESKTOP LAYOUT - Full height sidebar */}
+            <View style={[styles.main, { width: mainWidth }]}>
+              {renderTopBar()}
+              {renderCategoryNav()}
+              <View style={styles.gridContainer}>
+                {isLoadingDishes ? (
+                  <ActivityIndicator color={Theme.primary} style={{ marginTop: 50 }} />
+                ) : (
+                  <FlatList
+                    data={filteredItems}
+                    keyExtractor={(item) => item.DishId}
+                    numColumns={columns}
+                    key={columns}
+                    renderItem={renderDishItem}
+                    columnWrapperStyle={{ gap: gap, marginBottom: gap }}
+                    contentContainerStyle={styles.listPadding}
+                    showsVerticalScrollIndicator={false}
                   />
-                </TouchableOpacity>
-              )}
+                )}
+              </View>
             </View>
-            <View style={styles.topActions}>
-              {!isLarge && (
-                <TouchableOpacity
-                  style={[styles.iconBtn, { backgroundColor: Theme.success }]}
-                  onPress={() => router.push("/cart")}
-                >
-                  <Ionicons name="cart" size={18} color="#fff" />
-                </TouchableOpacity>
-              )}
-            </View>
+            {isLarge && <CartSidebar width={cartWidth} />}
           </View>
+        ) : (
+          <View style={{ flex: 1, backgroundColor: Theme.bgMain }}>
+            {/* TAB/PHONE LAYOUT - Hawker Style */}
+            <View style={{ padding: 20, paddingBottom: 0 }}>
+              {renderTopBar()}
+              {renderCategoryNav()}
+            </View>
 
-          {/* TWO-TIER CATEGORY TABS */}
-          <View style={styles.categoryNavigation}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.catScroll}
-            >
-              {kitchens.map((k) => (
-                <TouchableOpacity
-                  key={k.CategoryId}
-                  style={[
-                    styles.catPill,
-                    selectedKitchenId === k.CategoryId && styles.catPillActive,
-                  ]}
-                  onPress={() => loadGroups(k.CategoryId)}
-                >
-                  <Text
-                    style={[
-                      styles.catText,
-                      selectedKitchenId === k.CategoryId &&
-                        styles.catTextActive,
-                    ]}
-                  >
-                    {k.KitchenTypeName}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={{ marginTop: 10 }}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.groupScroll}
-              >
-                {groups.map((g) => (
-                  <TouchableOpacity
-                    key={g.DishGroupId}
-                    style={[
-                      styles.groupPill,
-                      selectedGroup === g.DishGroupId && styles.groupPillActive,
-                    ]}
-                    onPress={() => loadDishes(g.DishGroupId)}
-                  >
-                    <Text
-                      style={[
-                        styles.groupText,
-                        selectedGroup === g.DishGroupId &&
-                          styles.groupTextActive,
-                      ]}
-                    >
-                      {g.DishGroupName}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+            <View style={[styles.layout, { flex: 1 }]}>
+              <View style={[styles.main, { width: mainWidth, paddingTop: 0 }]}>
+                <View style={styles.gridContainer}>
+                  {isLoadingDishes ? (
+                    <ActivityIndicator color={Theme.primary} style={{ marginTop: 50 }} />
+                  ) : (
+                    <FlatList
+                      data={filteredItems}
+                      keyExtractor={(item) => item.DishId}
+                      numColumns={columns}
+                      key={columns}
+                      renderItem={renderDishItem}
+                      columnWrapperStyle={{ gap: gap, marginBottom: gap }}
+                      contentContainerStyle={styles.listPadding}
+                      showsVerticalScrollIndicator={false}
+                    />
+                  )}
+                </View>
+              </View>
+              {isLarge && <CartSidebar width={cartWidth} />}
             </View>
           </View>
-
-          {/* PRODUCT GRID */}
-          <View style={styles.gridContainer}>
-            {isLoadingDishes ? (
-              <ActivityIndicator
-                color={Theme.primary}
-                style={{ marginTop: 50 }}
-              />
-            ) : (
-              <FlatList
-                data={filteredItems}
-                keyExtractor={(item) => item.DishId}
-                numColumns={columns}
-                key={columns}
-                renderItem={renderDishItem}
-                columnWrapperStyle={{ gap: gap, marginBottom: gap }}
-                contentContainerStyle={styles.listPadding}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
-          </View>
-        </View>
-
-        {/* RIGHT CART SIDEBAR */}
-        {isLarge && <CartSidebar width={cartWidth} />}
+        )}
 
         {/* MODIFIER MODAL (Screenshot 1 Style) */}
         {showModifier && selectedDish && (
