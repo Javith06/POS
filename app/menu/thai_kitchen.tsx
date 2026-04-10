@@ -160,13 +160,14 @@ export default function MenuScreen() {
   const orderContext = useOrderContextStore((state) => state.currentOrder);
   const carts = useCartStore((state) => state.carts);
 
-  const isLarge = width > 900;
-  const isTablet = width > 768;
-  const railWidth = 0; // Removed sidebar width
-  const cartWidth = isLarge ? 400 : 0;
+  const isLandscape = width > 900;
+  const isTabletPortrait = width >= 600 && width <= 900;
+  const isLarge = width >= 600; // Cart visible for both tablet and desktop
+
+  const cartWidth = isLandscape ? 350 : (isTabletPortrait ? 300 : 0);
   const mainWidth = width - cartWidth;
 
-  const columns = isLarge ? 6 : isTablet ? 3 : 2;
+  const columns = isLandscape ? 6 : (isTabletPortrait ? 2 : 2);
   const gap = 15;
   const cardWidth = (mainWidth - 60 - gap * (columns - 1)) / columns;
 
