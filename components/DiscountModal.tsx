@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -36,9 +36,59 @@ export default function DiscountModal({
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [inputValue, setInputValue] = useState("");
   const [previewDiscount, setPreviewDiscount] = useState(0);
+  const [dbDiscounts, setDbDiscounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const quickPercentages = [5, 10, 15, 20, 25, 50];
-  const quickFixed = [5, 10, 20, 50, 75, 100];
+  const isFetchingRef = useRef(false);
+
+  const fetchDiscounts = async () => {
+    if (isFetchingRef.current) return; // Prevent double-fetch
+    isFetchingRef.current = true;
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_URL}/api/discounts`);
+      const data = await res.json();
+      if (Array.isArray(data)) setDbDiscounts(data);
+    } catch (err) {
+      console.error("Fetch discounts error:", err);
+    } finally {
+      setLoading(false);
+      isFetchingRef.current = false;
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch once — cache in state for lifetime of the component
+    if (visible && dbDiscounts.length === 0) fetchDiscounts();
+  }, [visible]);
+
+  const handleApplyDbDiscount = (disc: any) => {
+    let type: "percentage" | "fixed" = "percentage";
+    let value = 0;
+
+    const pct = parseFloat(disc.DiscountPercentage) || 0;
+    const isGuest = parseInt(disc.isGuestMeal) === 1;
+    const fixedAmt = parseFloat(disc.DiscountAmount) || 0;
+
+    if (isGuest) {
+      type = "percentage";
+      value = 100;
+    } else if (pct > 0) {
+      type = "percentage";
+      value = pct;
+    } else if (fixedAmt > 0) {
+      type = "fixed";
+      value = fixedAmt;
+    } else {
+      return; // No valid discount value — do nothing
+    }
+
+    const discountData = { applied: true, type, value, label: disc.Description || disc.DiscountCode };
+    applyDiscount(discountData);
+    const currentContext = getOrderContext();
+    if (currentContext) updateOrderDiscount(currentContext, discountData);
+    onClose();
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -106,14 +156,31 @@ export default function DiscountModal({
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.sectionLabel}>Quick Select</Text>
-          <View style={styles.quickRow}>
-            {(discountType === "percentage" ? quickPercentages : quickFixed).map((val) => (
-              <TouchableOpacity key={val} style={[styles.quickBtn, inputValue === val.toString() && styles.quickBtnActive]} onPress={() => setInputValue(val.toString())}>
-                <Text style={[styles.quickText, inputValue === val.toString() && styles.quickTextActive]}>{discountType === "fixed" ? "$" : ""}{val}{discountType === "percentage" ? "%" : ""}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {dbDiscounts.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>Available Promotions</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.promoScroll}>
+                {dbDiscounts.map((disc) => (
+                  <TouchableOpacity key={disc.DiscountId} style={styles.discountCard} onPress={() => handleApplyDbDiscount(disc)}>
+                    <Text style={styles.discountCardLabel}>
+                      {parseInt(disc.isGuestMeal) === 1
+                        ? "100%"
+                        : parseFloat(disc.DiscountPercentage) > 0
+                          ? `${parseFloat(disc.DiscountPercentage)}%`
+                          : `$${parseFloat(disc.DiscountAmount) || 0}`}
+                    </Text>
+                    <Text style={styles.discountCardSmall} numberOfLines={2}>
+                      {disc.Description || disc.DiscountCode}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          )}
+
+          {loading && dbDiscounts.length === 0 && (
+            <ActivityIndicator color={Theme.primary} style={{ marginBottom: 20 }} />
+          )}
 
 
 

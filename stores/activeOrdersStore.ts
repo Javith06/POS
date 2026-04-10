@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { CartItem, getContextId, useCartStore } from "./cartStore";
+import { CartItem, DiscountInfo, getContextId, useCartStore } from "./cartStore";
 import { OrderContext } from "./orderContextStore";
 
 /* ================= TYPES ================= */
@@ -9,11 +9,6 @@ export type OrderItem = CartItem & {
   sentAt?: number;
 };
 
-export type DiscountInfo = {
-  applied: boolean;
-  type: "percentage" | "fixed";
-  value: number;
-};
 
 export type ActiveOrder = {
   orderId: string;

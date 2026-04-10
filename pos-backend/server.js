@@ -246,6 +246,125 @@ app.get("/test", (req, res) => {
   res.send("TEST OK");
 });
 
+/* ================= AUTH - LOGIN ================= */
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const { userName, password } = req.body;
+
+    if (!userName || !password) {
+      return res.status(400).json({ success: false, message: "User ID and Password are required." });
+    }
+
+    // Query user joined with their group/role
+    const result = await pool.request()
+      .input("UserName", userName)
+      .query(`
+        SELECT 
+          u.UserId,
+          u.UserCode,
+          u.UserName,
+          u.UserPassword,
+          u.FullName,
+          u.FirstName,
+          u.LastName,
+          u.IsDisabled,
+          u.UserGroupid,
+          g.UserGroupCode AS RoleCode,
+          g.UserGroupName AS RoleName
+        FROM [dbo].[UserMaster] u
+        LEFT JOIN [dbo].[UserGroupMaster] g ON u.UserGroupid = g.UserGroupId
+        WHERE u.UserName = @UserName
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(401).json({ success: false, message: "Invalid User ID or Password." });
+    }
+
+    const user = result.recordset[0];
+
+    // Check if user account is disabled
+    if (user.IsDisabled === true || user.IsDisabled === 1) {
+      return res.status(403).json({ success: false, message: "Your account is disabled. Contact administrator." });
+    }
+
+    // Passwords are stored as Base64 encoded strings in the DB
+    // Decode DB password and compare with entered password
+    let storedPassword = "";
+    try {
+      storedPassword = Buffer.from(user.UserPassword, "base64").toString("utf8");
+    } catch (e) {
+      storedPassword = user.UserPassword; // fallback: compare raw
+    }
+
+    if (storedPassword !== password) {
+      return res.status(401).json({ success: false, message: "Invalid User ID or Password." });
+    }
+
+    // Update LastLogInDate
+    await pool.request()
+      .input("UserId", user.UserId)
+      .query("UPDATE [dbo].[UserMaster] SET LastLogInDate = GETDATE() WHERE UserId = @UserId");
+
+    console.log(`✅ Login: ${user.FullName || user.UserName} [${user.RoleName}]`);
+
+    return res.json({
+      success: true,
+      user: {
+        userId: user.UserId,
+        userCode: user.UserCode,
+        userName: user.UserName,
+        fullName: user.FullName || user.FirstName || user.UserName,
+        role: user.RoleCode || "CASHIER",
+        roleName: user.RoleName || "Cashier",
+      }
+    });
+  } catch (err) {
+    console.error("LOGIN ERROR:", err);
+    res.status(500).json({ success: false, message: "Server error. Please try again." });
+  }
+});
+
+/* ================= AUTH - PERMISSIONS ================= */
+app.get("/api/auth/permissions/:userGroupCode", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const { userGroupCode } = req.params;
+
+    const result = await pool.request()
+      .input("UserGroupCode", userGroupCode.trim())
+      .query(`
+        SELECT 
+          LTRIM(RTRIM(FormCode)) AS FormCode,
+          LTRIM(RTRIM(AllowAdd))    AS AllowAdd,
+          LTRIM(RTRIM(AllowUpdate)) AS AllowUpdate,
+          LTRIM(RTRIM(AllowDelete)) AS AllowDelete,
+          LTRIM(RTRIM(AllowRead))   AS AllowRead
+        FROM [dbo].[UserPermission]
+        WHERE LTRIM(RTRIM(UserGroupCode)) = @UserGroupCode
+      `);
+
+    // Convert rows into a flat map: { "FORMCODE": { canAdd, canUpdate, canDelete, canRead } }
+    const permMap = {};
+    for (const row of result.recordset) {
+      if (row.FormCode) {
+        permMap[row.FormCode] = {
+          canAdd:    row.AllowAdd    === "A",
+          canUpdate: row.AllowUpdate === "U",
+          canDelete: row.AllowDelete === "D",
+          canRead:   row.AllowRead   === "R",
+        };
+      }
+    }
+
+    console.log(`✅ Permissions loaded for [${userGroupCode}]: ${Object.keys(permMap).length} forms`);
+    res.json(permMap);
+  } catch (err) {
+    console.error("PERMISSIONS FETCH ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ================= IN-MEMORY TABLE LOCKS ================= */
 // Stores { tableId: { lockedBy: string, lockedAt: number } }
 const tableLocks = new Map();
@@ -1196,12 +1315,22 @@ app.get("/api/discounts", async (req, res) => {
     const pool = await poolPromise;
     const result = await pool.request().query(`
       SELECT 
-        DiscountId, DiscountQty, Discountprice, ActualPrice, 
-        FromDate, ToDate, isActive, CreatedBy, CreatedDate
+        MIN(CAST(DiscountId AS NVARCHAR(50))) AS DiscountId,
+        MIN(DiscountCode) AS DiscountCode,
+        Description,
+        MAX(DiscountPercentage) AS DiscountPercentage,
+        MAX(CAST(isGuestMeal AS INT)) AS isGuestMeal,
+        MAX(ISNULL(DiscountAmount, 0)) AS DiscountAmount
       FROM [dbo].[Discount]
-      WHERE isActive = 1 
-      AND CAST(GETDATE() AS DATE) BETWEEN CAST(FromDate AS DATE) AND CAST(ToDate AS DATE)
-      ORDER BY DiscountQty ASC
+      WHERE 
+        (
+          (DiscountPercentage IS NOT NULL AND DiscountPercentage > 0)
+          OR (isGuestMeal = 1)
+        )
+        AND Description IS NOT NULL 
+        AND LTRIM(RTRIM(Description)) <> ''
+      GROUP BY Description
+      ORDER BY MAX(DiscountPercentage) DESC
     `);
     res.json(result.recordset || []);
   } catch (err) {

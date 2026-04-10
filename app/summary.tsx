@@ -317,7 +317,9 @@ export default function SummaryScreen() {
 
               {discountInfo?.applied && (
                 <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: Theme.danger }]}>Discount</Text>
+                  <Text style={[styles.summaryLabel, { color: Theme.danger }]}>
+                    {discountInfo.label || "Discount"}
+                  </Text>
                   <Text style={[styles.summaryValue, { color: Theme.danger }]}>-${discountAmount.toFixed(2)}</Text>
                 </View>
               )}

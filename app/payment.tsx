@@ -232,7 +232,7 @@ export default function PaymentScreen() {
             ${itemsHtml}
             <div class="divider"></div>
             <div class="flex-row"><span>Subtotal:</span><span>$${displaySubtotal.toFixed(2)}</span></div>
-            ${discountAmount > 0 ? `<div class="flex-row"><span>Discount:</span><span>-$${discountAmount.toFixed(2)}</span></div>` : ''}
+            ${discountAmount > 0 ? `<div class="flex-row"><span>${discount?.label || 'Discount'}:</span><span>-$${discountAmount.toFixed(2)}</span></div>` : ''}
             ${gstEnabled ? `<div class="flex-row"><span>GST (${gstPercentage}%):</span><span>$${tax.toFixed(2)}</span></div>` : ''}
             <div class="flex-row bold" style="font-size: 14px; margin-top: 5px;"><span>TOTAL:</span><span>$${total.toFixed(2)}</span></div>
             <div class="divider"></div>
@@ -353,7 +353,9 @@ export default function PaymentScreen() {
 
                     {discount?.applied && (
                       <View style={styles.breakRow}>
-                        <Text style={[styles.breakLabel, { color: Theme.danger }]}>Discount</Text>
+                        <Text style={[styles.breakLabel, { color: Theme.danger }]}>
+                          {discount.label || "Discount"}
+                        </Text>
                         <Text style={[styles.breakValue, { color: Theme.danger }]}>-${discountAmount.toFixed(2)}</Text>
                       </View>
                     )}

@@ -27,10 +27,11 @@ export type CartItem = {
   basePrice?: number; // Added to store the original dish price for recalculation
 };
 
-type DiscountInfo = {
+export type DiscountInfo = {
   applied: boolean;
   type: "percentage" | "fixed";
   value: number;
+  label?: string;
 };
 
 type CartState = {

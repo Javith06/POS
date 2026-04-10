@@ -27,6 +27,7 @@ import {
 import { getHeldOrders, removeHeldOrder } from "../../stores/heldOrdersStore";
 import { setOrderContext } from "../../stores/orderContextStore";
 import { useTableStatusStore } from "../../stores/tableStatusStore";
+import { useAuthStore } from "../../stores/authStore";
 
 // --- MEMOIZED TABLE COMPONENT ---
 const TableItemComponent = React.memo(({ 
@@ -217,6 +218,23 @@ export default function Category() {
   const carts = useCartStore((s) => s.carts);
 
   const isTablet = width >= 768;
+
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const canAccessSalesReport = useAuthStore((s) => s.canAccessSalesReport);
+  const canAccessMembers     = useAuthStore((s) => s.canAccessMembers);
+  const canAccessTimeEntry   = useAuthStore((s) => s.canAccessTimeEntry);
+  const canAccessLockTables  = useAuthStore((s) => s.canAccessLockTables);
+  const canAccessKDS         = useAuthStore((s) => s.canAccessKDS);
+
+  // ── Route guard: redirect to login if not authenticated ──
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!user) {
+        router.replace("/");
+      }
+    }, [user])
+  );
 
   useEffect(() => {
     fetchTables();
@@ -536,45 +554,86 @@ export default function Category() {
 
         {/* RIGHT — Action Buttons */}
         <View style={[styles.navRightGroup, { gap: isTablet ? 8 : 6 }]}>
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => router.push("/TimeEntry")}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="time-outline" size={16} color={Theme.primary} />
-            {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Time Entry</Text>}
-          </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => router.push("/members")}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="people-outline" size={16} color={Theme.info} />
-            {isTablet && <Text style={[styles.headerActionText, { color: Theme.info }]}>Members</Text>}
-          </TouchableOpacity>
+          {/* User Info Chip */}
+          {user && (
+            <View style={styles.userChip}>
+              <View style={styles.userChipAvatar}>
+                <Ionicons name="person" size={12} color={Theme.primary} />
+              </View>
+              {isTablet && (
+                <View>
+                  <Text style={styles.userChipName} numberOfLines={1}>{user.fullName}</Text>
+                  <Text style={styles.userChipRole}>{user.roleName}</Text>
+                </View>
+              )}
+            </View>
+          )}
 
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => router.push("/locked-tables")}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="lock-closed-outline" size={16} color={Theme.warning} />
-            {isTablet && <Text style={[styles.headerActionText, { color: Theme.warning }]}>Lock Tables</Text>}
-          </TouchableOpacity>
+          {/* Time Entry — gated by OPRTEN */}
+          {canAccessTimeEntry() && (
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push("/TimeEntry")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="time-outline" size={16} color={Theme.primary} />
+              {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Time Entry</Text>}
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity
-            style={[styles.headerActionBtn, styles.salesBtn]}
-            onPress={() => router.push("/sales-report")}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="bar-chart-outline" size={16} color={Theme.primary} />
-            {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Sales</Text>}
-          </TouchableOpacity>
+          {/* Members — gated by OPRMBR */}
+          {canAccessMembers() && (
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push("/members")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="people-outline" size={16} color={Theme.info} />
+              {isTablet && <Text style={[styles.headerActionText, { color: Theme.info }]}>Members</Text>}
+            </TouchableOpacity>
+          )}
 
+          {/* Lock Tables — gated by MSTTBL */}
+          {canAccessLockTables() && (
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push("/locked-tables")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="lock-closed-outline" size={16} color={Theme.warning} />
+              {isTablet && <Text style={[styles.headerActionText, { color: Theme.warning }]}>Lock Tables</Text>}
+            </TouchableOpacity>
+          )}
+
+          {/* KDS — gated by OPRSTK */}
+          {canAccessKDS() && (
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={() => router.push("/kds")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="grid-outline" size={16} color={Theme.info} />
+              {isTablet && <Text style={[styles.headerActionText, { color: Theme.info }]}>KDS</Text>}
+            </TouchableOpacity>
+          )}
+
+          {/* Sales Report — gated by RPTSAL */}
+          {canAccessSalesReport() && (
+            <TouchableOpacity
+              style={[styles.headerActionBtn, styles.salesBtn]}
+              onPress={() => router.push("/sales-report")}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="bar-chart-outline" size={16} color={Theme.primary} />
+              {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Sales</Text>}
+            </TouchableOpacity>
+          )}
+
+          {/* Logout — always visible */}
           <TouchableOpacity
             style={[styles.headerActionBtn, styles.logoutBtn]}
-            onPress={() => router.replace("/")}
+            onPress={() => { logout(); router.replace("/"); }}
             activeOpacity={0.75}
           >
             <Ionicons name="log-out-outline" size={16} color={Theme.danger} />
@@ -864,4 +923,39 @@ const styles = StyleSheet.create({
     borderColor: Theme.primaryBorder,
   },
   retryText: { color: Theme.primary, fontFamily: Fonts.bold, fontSize: 14 },
+
+  /* ── User Chip ── */
+  userChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Theme.primaryLight,
+    borderRadius: Theme.radiusMd,
+    borderWidth: 1,
+    borderColor: Theme.primaryBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 2,
+  },
+  userChipAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Theme.primary + "20",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  userChipName: {
+    color: Theme.primary,
+    fontFamily: Fonts.bold,
+    fontSize: 12,
+    maxWidth: 100,
+  },
+  userChipRole: {
+    color: Theme.textMuted,
+    fontFamily: Fonts.medium,
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+  },
 });
