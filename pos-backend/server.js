@@ -250,6 +250,10 @@ app.get("/test", (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   try {
     const pool = await poolPromise;
+    if (!pool) {
+      console.error("❌ /api/auth/login: Database connection not established.");
+      return res.status(503).json({ success: false, message: "Database connection busy or unavailable. Please try again in 30 seconds." });
+    }
     const { userName, password } = req.body;
 
     if (!userName || !password) {
@@ -445,6 +449,10 @@ app.get("/api/tables/diagnostic", async (req, res) => {
 app.get("/tables", async (req, res) => {
   try {
     const pool = await poolPromise;
+    if (!pool) {
+      console.error("❌ /tables: Database connection not established.");
+      return res.status(503).json({ error: "Database connection busy or unavailable. Please refresh in a moment." });
+    }
     const { section } = req.query;
 
     // Map frontend section names to DiningSection values in the DB

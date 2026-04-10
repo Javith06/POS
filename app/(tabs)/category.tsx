@@ -275,7 +275,7 @@ export default function Category() {
   const fetchTables = async () => {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       const response = await fetch(`${API_URL}/tables`, {
         signal: controller.signal,
         headers: { Accept: "application/json" },

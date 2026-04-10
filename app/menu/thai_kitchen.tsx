@@ -162,11 +162,11 @@ export default function MenuScreen() {
 
   const isLarge = width > 900;
   const isTablet = width > 768;
-  const railWidth = 90;
+  const railWidth = 0; // Removed sidebar width
   const cartWidth = isLarge ? 400 : 0;
-  const mainWidth = width - railWidth - cartWidth;
+  const mainWidth = width - cartWidth;
 
-  const columns = isLarge ? 5 : isTablet ? 3 : 2;
+  const columns = isLarge ? 6 : isTablet ? 3 : 2;
   const gap = 15;
   const cardWidth = (mainWidth - 60 - gap * (columns - 1)) / columns;
 
@@ -360,8 +360,7 @@ export default function MenuScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.layout}>
-        {/* LEFT NAV RAIL */}
-        <NavRail />
+        {/* LEFT NAV RAIL REMOVED */}
 
         {/* MAIN CONTENT */}
         <View style={[styles.main, { width: mainWidth }]}>
