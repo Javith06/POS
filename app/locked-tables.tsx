@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
   StatusBar,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "../constants/Fonts";
@@ -38,6 +39,12 @@ const SECTION_LABELS: Record<string, string> = {
   SECTION_3: "Section 3",
   TAKEAWAY: "Takeaway",
 };
+
+// --- MOBILE SOLID COLORS ---
+const IS_MOBILE = Platform.OS !== 'web';
+const SOLID_LIGHT_GREEN = '#F0FDF4'; 
+const SOLID_LIGHT_AMBER = '#FFFBEB';
+const SOLID_LIGHT_RED   = '#FEF2F2';
 
 export default function LockedTablesScreen() {
   const router = useRouter();
@@ -202,8 +209,22 @@ export default function LockedTablesScreen() {
     // Define "Active" as anything with an order that isn't EMPTY or LOCKED
     const isActive = tableStatus && ['SENT', 'HOLD', 'BILL_REQUESTED'].includes(tableStatus.status);
 
+    const cardBg = item.isLocked 
+      ? (IS_MOBILE ? SOLID_LIGHT_RED : Theme.danger + "10")
+      : isActive 
+        ? (IS_MOBILE ? SOLID_LIGHT_GREEN : Theme.success + "05")
+        : Theme.bgCard;
+
     return (
-      <View style={[styles.tableCard, item.isLocked && styles.lockedCard, isActive && styles.activeCard]}>
+      <View style={[
+        styles.tableCard, 
+        { 
+          backgroundColor: cardBg,
+          elevation: (item.isLocked || isActive) ? 0 : 2, // Fix fill artifacts
+          borderWidth: (item.isLocked || isActive) ? 2 : 1.5,
+          borderColor: item.isLocked ? Theme.danger + "40" : isActive ? Theme.success + "30" : Theme.border
+        }
+      ]}>
         <TouchableOpacity
           style={styles.tableContent}
           onPress={() => {
@@ -223,7 +244,7 @@ export default function LockedTablesScreen() {
             <Ionicons
               name={item.isLocked ? "lock-closed" : isActive ? "restaurant" : "lock-open-outline"}
               size={24}
-              color={item.isLocked ? Theme.warning : isActive ? Theme.success : Theme.textMuted}
+              color={item.isLocked ? Theme.danger : isActive ? Theme.success : Theme.textMuted}
             />
           </View>
           <Text style={styles.tableNumber}>{item.tableNumber}</Text>
@@ -238,7 +259,7 @@ export default function LockedTablesScreen() {
             onPress={() => unlockTable(item.tableId, item.tableNumber)}
             activeOpacity={0.7}
           >
-            <Ionicons name="close-circle" size={22} color={Theme.danger} />
+            <Ionicons name="close-circle" size={18} color={Theme.danger} />
           </TouchableOpacity>
         )}
       </View>
@@ -269,7 +290,7 @@ export default function LockedTablesScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.lockedTablesScroll}>
             {lockedTables.map((table, index) => (
               <View key={`${table.tableId}-${index}`} style={styles.lockedTablePreview}>
-                <Ionicons name="lock-closed" size={16} color={Theme.warning} />
+                <Ionicons name="lock-closed" size={16} color={Theme.danger} />
                 <Text style={styles.lockedTablePreviewNo}>Table {table.tableNumber}</Text>
               </View>
             ))}
@@ -402,9 +423,9 @@ const styles = StyleSheet.create({
   lockedTablesScroll: { flexDirection: "row" },
   lockedTablePreview: {
     flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 15, paddingVertical: 10,
-    backgroundColor: Theme.warning + "15", borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: Theme.warning + "30",
+    backgroundColor: Theme.danger + "15", borderRadius: 10, marginRight: 10, borderWidth: 1, borderColor: Theme.danger + "30",
   },
-  lockedTablePreviewNo: { color: Theme.warning, fontFamily: Fonts.bold, fontSize: 14 },
+  lockedTablePreviewNo: { color: Theme.danger, fontFamily: Fonts.bold, fontSize: 14 },
   sectionTabs: { flexDirection: "row", padding: 20, gap: 10 },
   sectionTab: {
     flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: Theme.bgCard,
@@ -430,16 +451,25 @@ const styles = StyleSheet.create({
     width: 56, height: 56, borderRadius: 16, backgroundColor: Theme.bgMuted,
     justifyContent: "center", alignItems: "center", marginBottom: 12, borderWidth: 1, borderColor: Theme.border,
   },
-  lockedIcon: { backgroundColor: Theme.warning + "15", borderColor: Theme.warning + "30" },
+  lockedIcon: { backgroundColor: Theme.danger + "15", borderColor: Theme.danger + "30" },
   tableNumber: { color: Theme.textPrimary, fontFamily: Fonts.black, fontSize: 20, letterSpacing: 0.5 },
   tableStatus: { color: Theme.textMuted, fontFamily: Fonts.bold, fontSize: 11, marginTop: 8, textTransform: "uppercase" },
-  lockedStatus: { color: Theme.warning },
+  lockedStatus: { color: Theme.danger },
   activeCard: { backgroundColor: Theme.success + "05", borderColor: Theme.success + "30" },
   activeIcon: { backgroundColor: Theme.success + "10", borderColor: Theme.success + "20" },
   activeStatus: { color: Theme.success },
   unlockBtn: {
-    position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: 10,
-    backgroundColor: Theme.danger + "15", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Theme.danger + "30",
+    position: "absolute", 
+    top: 5, 
+    right: 5, 
+    width: 28, 
+    height: 28, 
+    borderRadius: 8,
+    backgroundColor: Theme.danger + "15", 
+    justifyContent: "center", 
+    alignItems: "center", 
+    borderWidth: 1, 
+    borderColor: Theme.danger + "30",
   },
   footer: {
     position: "absolute", bottom: 0, left: 0, right: 0, padding: 20,

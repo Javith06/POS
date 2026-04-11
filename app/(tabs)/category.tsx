@@ -13,6 +13,7 @@ import {
   View,
   StatusBar,
   Platform,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "../../constants/Fonts";
@@ -220,6 +221,7 @@ export default function Category() {
   const [activeTab, setActiveTab] = useState<string>("SECTION_1");
   const [allTables, setAllTables] = useState<TableItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
   const sectionScrollRef = useRef<ScrollView>(null);
 
   const tables = useTableStatusStore((s) => s.tables);
@@ -565,46 +567,6 @@ export default function Category() {
 
         {/* RIGHT — Action Buttons */}
         <View style={[styles.navRightGroup, { gap: isTablet ? 8 : 6 }]}>
-
-          {/* User Info Chip */}
-          {user && (
-            <View style={styles.userChip}>
-              <View style={styles.userChipAvatar}>
-                <Ionicons name="person" size={12} color={Theme.primary} />
-              </View>
-              {isTablet && (
-                <View>
-                  <Text style={styles.userChipName} numberOfLines={1}>{user.fullName}</Text>
-                  <Text style={styles.userChipRole}>{user.roleName}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Time Entry — gated by OPRTEN */}
-          {canAccessTimeEntry() && (
-            <TouchableOpacity
-              style={styles.headerActionBtn}
-              onPress={() => router.push("/TimeEntry")}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="time-outline" size={16} color={Theme.primary} />
-              {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Time Entry</Text>}
-            </TouchableOpacity>
-          )}
-
-          {/* Members — gated by OPRMBR */}
-          {canAccessMembers() && (
-            <TouchableOpacity
-              style={styles.headerActionBtn}
-              onPress={() => router.push("/members")}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="people-outline" size={16} color={Theme.info} />
-              {isTablet && <Text style={[styles.headerActionText, { color: Theme.info }]}>Members</Text>}
-            </TouchableOpacity>
-          )}
-
           {/* Lock Tables — gated by MSTTBL */}
           {canAccessLockTables() && (
             <TouchableOpacity
@@ -612,8 +574,16 @@ export default function Category() {
               onPress={() => router.push("/locked-tables")}
               activeOpacity={0.75}
             >
-              <Ionicons name="lock-closed-outline" size={16} color={Theme.warning} />
-              {isTablet && <Text style={[styles.headerActionText, { color: Theme.warning }]}>Lock Tables</Text>}
+              <Ionicons
+                name="lock-closed-outline"
+                size={16}
+                color={Theme.warning}
+              />
+              {isTablet && (
+                <Text style={[styles.headerActionText, { color: Theme.warning }]}>
+                  Lock Tables
+                </Text>
+              )}
             </TouchableOpacity>
           )}
 
@@ -624,34 +594,112 @@ export default function Category() {
               onPress={() => router.push("/kds")}
               activeOpacity={0.75}
             >
-              <Ionicons name="grid-outline" size={16} color={Theme.info} />
-              {isTablet && <Text style={[styles.headerActionText, { color: Theme.info }]}>KDS</Text>}
+              <Ionicons name="tv-outline" size={16} color={Theme.info} />
+              {isTablet && (
+                <Text style={[styles.headerActionText, { color: Theme.info }]}>
+                  KDS
+                </Text>
+              )}
             </TouchableOpacity>
           )}
 
-          {/* Sales Report — gated by RPTSAL */}
-          {canAccessSalesReport() && (
-            <TouchableOpacity
-              style={[styles.headerActionBtn, styles.salesBtn]}
-              onPress={() => router.push("/sales-report")}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="bar-chart-outline" size={16} color={Theme.primary} />
-              {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Sales</Text>}
-            </TouchableOpacity>
-          )}
-
-          {/* Logout — always visible */}
+          {/* NEW CONSOLIDATED MENU BUTTON */}
           <TouchableOpacity
-            style={[styles.headerActionBtn, styles.logoutBtn]}
-            onPress={() => { logout(); router.replace("/"); }}
+            style={[styles.headerActionBtn, { backgroundColor: Theme.primaryLight, borderColor: Theme.primaryBorder }]}
+            onPress={() => setIsMenuVisible(true)}
             activeOpacity={0.75}
           >
-            <Ionicons name="log-out-outline" size={16} color={Theme.danger} />
-            {isTablet && <Text style={[styles.headerActionText, { color: Theme.danger }]}>Logout</Text>}
+            <Ionicons name="menu-outline" size={20} color={Theme.primary} />
+            {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Menu</Text>}
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ═══════════ MORE MENU MODAL ═══════════ */}
+      <Modal
+        visible={isMenuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMenuVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setIsMenuVisible(false)}
+        >
+          <View style={styles.menuContent}>
+            {/* User Info Header */}
+            {user && (
+              <View style={styles.menuUserSection}>
+                <View style={styles.menuAvatar}>
+                  <Ionicons name="person" size={20} color={Theme.primary} />
+                </View>
+                <View>
+                  <Text style={styles.menuUserName}>{user.fullName}</Text>
+                  <Text style={styles.menuUserRole}>{user.roleName}</Text>
+                </View>
+              </View>
+            )}
+
+            <View style={styles.menuDivider} />
+
+            {/* Menu Options */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {canAccessTimeEntry() && (
+                 <TouchableOpacity
+                   style={styles.menuItem}
+                   onPress={() => { setIsMenuVisible(false); router.push("/TimeEntry"); }}
+                 >
+                   <View style={[styles.menuIconContainer, { backgroundColor: Theme.primary + '10' }]}>
+                     <Ionicons name="time-outline" size={18} color={Theme.primary} />
+                   </View>
+                   <Text style={styles.menuItemText}>Time Entry</Text>
+                 </TouchableOpacity>
+              )}
+
+              {canAccessMembers() && (
+                 <TouchableOpacity
+                   style={styles.menuItem}
+                   onPress={() => { setIsMenuVisible(false); router.push("/members"); }}
+                 >
+                   <View style={[styles.menuIconContainer, { backgroundColor: Theme.info + '10' }]}>
+                     <Ionicons name="people-outline" size={18} color={Theme.info} />
+                   </View>
+                   <Text style={styles.menuItemText}>Members</Text>
+                 </TouchableOpacity>
+              )}
+
+              {canAccessSalesReport() && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => { setIsMenuVisible(false); router.push("/sales-report"); }}
+                >
+                  <View style={[styles.menuIconContainer, { backgroundColor: Theme.primary + '10' }]}>
+                    <Ionicons name="bar-chart-outline" size={18} color={Theme.primary} />
+                  </View>
+                  <Text style={styles.menuItemText}>Sales Report</Text>
+                </TouchableOpacity>
+              )}
+
+              <View style={styles.menuDivider} />
+
+              <TouchableOpacity
+                style={[styles.menuItem, styles.logoutMenuItem]}
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  logout();
+                  router.replace("/");
+                }}
+              >
+                <View style={[styles.menuIconContainer, { backgroundColor: Theme.danger + '10' }]}>
+                  <Ionicons name="log-out-outline" size={18} color={Theme.danger} />
+                </View>
+                <Text style={[styles.menuItemText, { color: Theme.danger }]}>Logout</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* ═══════════ SECTION HEADER ═══════════ */}
       <View style={styles.sectionHeader}>
@@ -968,5 +1016,75 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textTransform: "uppercase",
     letterSpacing: 0.3,
+  },
+
+  /* ── More Menu Modal ── */
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 60,
+    paddingRight: 20,
+  },
+  menuContent: {
+    width: 260,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 10,
+    ...Theme.shadowLg,
+  },
+  menuUserSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+  },
+  menuAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Theme.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuUserName: {
+    fontSize: 15,
+    fontFamily: Fonts.black,
+    color: Theme.textPrimary,
+  },
+  menuUserRole: {
+    fontSize: 11,
+    fontFamily: Fonts.medium,
+    color: Theme.textMuted,
+    textTransform: 'uppercase',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: Theme.border,
+    marginVertical: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  menuIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuItemText: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
+    color: Theme.textPrimary,
+  },
+  logoutMenuItem: {
+    marginTop: 4,
   },
 });
