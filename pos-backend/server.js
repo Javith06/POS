@@ -369,6 +369,80 @@ app.get("/api/auth/permissions/:userGroupCode", async (req, res) => {
   }
 });
 
+/* ================= PAYMENT METHODS ================= */
+app.get("/api/payment-methods", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+      SELECT
+        LTRIM(RTRIM(PayMode))      AS payMode,
+        LTRIM(RTRIM(Description))  AS description,
+        Position,
+        Commission,
+        ServiceCharge,
+        isEntertainment,
+        isVoucher
+      FROM (
+        SELECT
+          PayMode, Description, Position, Commission,
+          ServiceCharge, isEntertainment, isVoucher,
+          ROW_NUMBER() OVER (
+            PARTITION BY
+              CASE
+                -- Normalize all cash variants (CAS, CASH, cash, cas...) into one group
+                WHEN UPPER(LTRIM(RTRIM(PayMode))) LIKE 'CAS%' THEN '__CASH__'
+                ELSE UPPER(LTRIM(RTRIM(PayMode)))
+              END
+            ORDER BY Position ASC
+          ) AS rn
+        FROM [dbo].[Paymode]
+        WHERE Active = 1
+      ) AS deduplicated
+      WHERE rn = 1
+      ORDER BY Position ASC
+    `);
+    res.json(result.recordset || []);
+  } catch (err) {
+    console.error("PAYMENT METHODS ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ================= PAYMENT DETAIL CUR ================= */
+app.get("/api/payment-detail/:payMode", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const { payMode } = req.params;
+
+    // Query PaymentDetailCur joined with Paymode for full details
+    // NULL-safe: use ISNULL to avoid nulls breaking the response
+    const result = await pool.request()
+      .input("PayMode", payMode.trim())
+      .query(`
+        SELECT TOP 1
+          ISNULL(LTRIM(RTRIM(p.PayMode)),      '')  AS payMode,
+          ISNULL(LTRIM(RTRIM(p.Description)),  '')  AS description,
+          ISNULL(p.Commission,    0)  AS commission,
+          ISNULL(p.ServiceCharge, 0)  AS serviceCharge,
+          ISNULL(p.isEntertainment, 0) AS isEntertainment,
+          ISNULL(p.isVoucher, 0)       AS isVoucher,
+          ISNULL(p.Position, 0)        AS position,
+          ISNULL(CAST(p.Active AS INT), 0) AS active
+        FROM [dbo].[Paymode] p
+        WHERE LTRIM(RTRIM(p.PayMode)) = @PayMode
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ error: "Payment mode not found" });
+    }
+
+    res.json(result.recordset[0]);
+  } catch (err) {
+    console.error("PAYMENT DETAIL ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 /* ================= IN-MEMORY TABLE LOCKS ================= */
 // Stores { tableId: { lockedBy: string, lockedAt: number } }
 const tableLocks = new Map();
@@ -1127,7 +1201,57 @@ app.post("/api/sales/save", async (req, res) => {
         }
       }
 
-      // 5. Update Member Balance if it was a Credit sale
+      // 5. Insert into PaymentDetailCur — maps the Paymode code → numeric Position
+      try {
+        // Look up the numeric Position for this payMode code
+        const paymodeRow = await transaction.request()
+          .input("PayModeCode", sql.VarChar(50), (paymentMethod || "CAS").trim())
+          .query(`
+            SELECT TOP 1 ISNULL(Position, 1) AS Position
+            FROM [dbo].[Paymode]
+            WHERE LTRIM(RTRIM(PayMode)) = @PayModeCode
+          `);
+        const paymodePosition = paymodeRow.recordset.length > 0
+          ? paymodeRow.recordset[0].Position
+          : 1;
+
+        // Read an existing BusinessUnitId from the table to stay consistent
+        const bizRow = await transaction.request().query(`
+          SELECT TOP 1 ISNULL(CAST(BusinessUnitId AS VARCHAR(50)), '1') AS BusinessUnitId
+          FROM [dbo].[PaymentDetailCur]
+        `);
+        const businessUnitId = bizRow.recordset.length > 0
+          ? bizRow.recordset[0].BusinessUnitId
+          : "1";
+
+        await transaction.request()
+          .input("PaymentId2",          sql.UniqueIdentifier, settlementId)
+          .input("RestaurantBillId",    sql.UniqueIdentifier, settlementId)
+          .input("BilledFor",           sql.Int,              1)
+          .input("PaymentCollectedOn",  sql.DateTime,         new Date())
+          .input("PaymentType",         sql.Int,              1)
+          .input("Paymode",             sql.Int,              paymodePosition)
+          .input("Amount",              sql.Decimal(18, 2),   totalAmount || 0)
+          .input("ReferenceNumber",     sql.NVarChar(100),    "")
+          .input("Remarks",             sql.NVarChar(200),    paymentMethod || "")
+          .input("BusinessUnitId",      sql.NVarChar(50),     businessUnitId)
+          .query(`
+            INSERT INTO [dbo].[PaymentDetailCur]
+              (PaymentId, RestaurantBillId, BilledFor, PaymentCollectedOn, PaymentType,
+               Paymode, Amount, ReferenceNumber, Remarks, BusinessUnitId)
+            VALUES
+              (@PaymentId2, @RestaurantBillId, @BilledFor, @PaymentCollectedOn, @PaymentType,
+               @Paymode, @Amount, @ReferenceNumber, @Remarks, @BusinessUnitId)
+          `);
+
+        console.log(`💳 PaymentDetailCur inserted: Paymode=${paymodePosition}, Amount=${totalAmount}`);
+      } catch (pdcErr) {
+        // Non-fatal: log and continue — don't rollback the whole sale
+        console.warn("⚠️ PaymentDetailCur insert skipped:", pdcErr.message);
+      }
+
+
+      // 6. Update Member Balance if it was a Credit sale
       if (memberId && (paymentMethod || "").toUpperCase() === "CREDIT") {
         await transaction
           .request()
@@ -1163,7 +1287,42 @@ app.post("/api/sales/save", async (req, res) => {
   }
 });
 
-// API 4: Get individual transactions by date range (used by the sales table)
+/* ================= PAYMENT HISTORY ================= */
+// Fetch recent payments from PaymentDetailCur joined with Paymode name
+app.get("/api/payment-history", async (req, res) => {
+  try {
+    const pool = await poolPromise;
+    const limit = parseInt(req.query.limit) || 50;
+
+    const result = await pool.request()
+      .input("Limit", sql.Int, limit)
+      .query(`
+        SELECT TOP (@Limit)
+          CAST(pdc.PaymentId        AS VARCHAR(50))           AS paymentId,
+          CAST(pdc.RestaurantBillId AS VARCHAR(50))           AS restaurantBillId,
+          CONVERT(VARCHAR(23), pdc.PaymentCollectedOn, 126)   AS paymentCollectedOn,
+          ISNULL(pdc.PaymentType, 0)                          AS paymentType,
+          ISNULL(pdc.Paymode, 0)                              AS paymodeId,
+          ISNULL(LTRIM(RTRIM(pm.PayMode)),     '')            AS payModeCode,
+          ISNULL(LTRIM(RTRIM(pm.Description)),'')            AS payModeDescription,
+          ISNULL(pm.Commission,    0)                         AS commission,
+          ISNULL(pm.ServiceCharge, 0)                         AS serviceCharge,
+          ISNULL(pdc.Amount,          0)                      AS amount,
+          ISNULL(pdc.ReferenceNumber, '')                     AS referenceNumber,
+          ISNULL(pdc.Remarks,         '')                     AS remarks
+        FROM [dbo].[PaymentDetailCur] pdc
+        LEFT JOIN [dbo].[Paymode] pm
+          ON pm.Position = pdc.Paymode
+        ORDER BY pdc.PaymentCollectedOn DESC
+      `);
+
+    res.json(result.recordset || []);
+  } catch (err) {
+    console.error("PAYMENT HISTORY ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get("/api/sales/transactions", async (req, res) => {
   try {
     const pool = await poolPromise;

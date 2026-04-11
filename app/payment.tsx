@@ -33,7 +33,49 @@ import {
   getOrderContext,
 } from "../stores/orderContextStore";
 import { useTableStatusStore } from "../stores/tableStatusStore";
-import { useGstStore } from "../stores/gstStore"; 
+import { useGstStore } from "../stores/gstStore";
+
+/* ================= PAYMENT METHOD ICON MAP ================= */
+type PaymentMethod = {
+  payMode: string;
+  description: string;
+  icon: string;
+  commission: number;
+  serviceCharge: number;
+  isEntertainment: boolean;
+  isVoucher: boolean;
+  position: number;
+};
+
+const PAYMODE_ICON_MAP: Record<string, string> = {
+  CAS:        "money-bill-wave",
+  CASH:       "money-bill-wave",
+  NETS:       "exchange-alt",
+  AMEX:       "cc-amex",
+  MASTER:     "cc-mastercard",
+  VISA:       "cc-visa",
+  PAYNOW:     "qrcode",
+  GRAB:       "mobile-alt",
+  FOODPANDA:  "mobile-alt",
+  DINERS:     "credit-card",
+  CHQ:        "university",
+  LEDGER:     "book",
+  VOUCHER:    "ticket-alt",
+  DEAL:       "ticket-alt",
+};
+
+function getPaymodeIcon(payMode: string): string {
+  const key = payMode.toUpperCase().replace(/[^A-Z]/g, "");
+  // Try exact match first, then prefix match
+  if (PAYMODE_ICON_MAP[key]) return PAYMODE_ICON_MAP[key];
+  for (const [k, v] of Object.entries(PAYMODE_ICON_MAP)) {
+    if (key.startsWith(k) || k.startsWith(key)) return v;
+  }
+  return "credit-card"; // fallback
+}
+
+const isCashMethod = (payMode: string) =>
+  /^(CAS|CASH)$/i.test(payMode.trim());
 
 export default function PaymentScreen() {
   const closeActiveOrder = useActiveOrdersStore((s) => s.closeActiveOrder);
@@ -56,15 +98,95 @@ export default function PaymentScreen() {
 
   const discount = activeOrder?.discount;
 
-  const [method, setMethod] = useState("CASH");
+  const [method, setMethod] = useState("CAS");
   const [cashInput, setCashInput] = useState("");
   const [processing, setProcessing] = useState(false);
   const [time, setTime] = useState(new Date());
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loadingMethods, setLoadingMethods] = useState(true);
+  const [selectedDetail, setSelectedDetail] = useState<PaymentMethod | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const { enabled: gstEnabled, percentage: gstPercentage, registrationNumber: gstRegNo, taxMode, loadSettings: loadGst } = useGstStore();
 
   useEffect(() => {
     loadGst();
+    fetchPaymentMethods();
   }, []);
+
+  const fetchPaymentMethods = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/payment-methods`);
+      if (!res.ok) throw new Error("Failed to load");
+      const data: any[] = await res.json();
+      const mapped: PaymentMethod[] = data.map((d) => ({
+        payMode:         d.payMode        || "",
+        description:     d.description    || d.payMode || "",
+        icon:            getPaymodeIcon(d.payMode || ""),
+        commission:      parseFloat(d.Commission)    || 0,
+        serviceCharge:   parseFloat(d.ServiceCharge) || 0,
+        isEntertainment: d.isEntertainment === 1 || d.isEntertainment === true,
+        isVoucher:       d.isVoucher       === 1 || d.isVoucher       === true,
+        position:        d.Position || 0,
+      }));
+
+      // Frontend deduplication: group all cash variants into one entry
+      const seen = new Set<string>();
+      const deduped = mapped.filter((m) => {
+        const key = isCashMethod(m.payMode) ? "__CASH__" : m.payMode.toUpperCase().trim();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      setPaymentMethods(deduped);
+      if (deduped.length > 0) {
+        setMethod(deduped[0].payMode);
+        fetchPaymentDetail(deduped[0].payMode, deduped[0]);
+      }
+    } catch {
+      const fallback = [
+        { payMode: "CAS",    description: "CASH",   icon: "money-bill-wave", commission: 0, serviceCharge: 0, isEntertainment: false, isVoucher: false, position: 1 },
+        { payMode: "NETS",   description: "NETS",   icon: "exchange-alt",   commission: 0, serviceCharge: 0, isEntertainment: false, isVoucher: false, position: 2 },
+        { payMode: "MASTER", description: "MASTER", icon: "cc-mastercard",  commission: 0, serviceCharge: 0, isEntertainment: false, isVoucher: false, position: 3 },
+        { payMode: "PAYNOW", description: "PayNow", icon: "qrcode",         commission: 0, serviceCharge: 0, isEntertainment: false, isVoucher: false, position: 4 },
+      ];
+      setPaymentMethods(fallback);
+      setSelectedDetail(fallback[0]);
+    } finally {
+      setLoadingMethods(false);
+    }
+  };
+
+  // Fetch live detail for a selected pay mode from the DB
+  const fetchPaymentDetail = async (payMode: string, fallback?: PaymentMethod) => {
+    setLoadingDetail(true);
+    try {
+      const res = await fetch(`${API_URL}/api/payment-detail/${encodeURIComponent(payMode)}`);
+      if (!res.ok) throw new Error("Not found");
+      const d = await res.json();
+      setSelectedDetail({
+        payMode:         d.payMode        || payMode,
+        description:     d.description    || payMode,
+        icon:            getPaymodeIcon(d.payMode || payMode),
+        commission:      parseFloat(d.commission)    || 0,
+        serviceCharge:   parseFloat(d.serviceCharge) || 0,
+        isEntertainment: d.isEntertainment === 1 || d.isEntertainment === true,
+        isVoucher:       d.isVoucher       === 1 || d.isVoucher       === true,
+        position:        d.position || 0,
+      });
+    } catch {
+      // Fallback to the card data if API call fails
+      setSelectedDetail(fallback || paymentMethods.find((m) => m.payMode === payMode) || null);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Called when user taps a payment method card
+  const handleSelectMethod = (m: PaymentMethod) => {
+    setMethod(m.payMode);
+    fetchPaymentDetail(m.payMode, m);
+  };
 
   /* ================= CALCULATIONS ================= */
 
@@ -174,7 +296,7 @@ export default function PaymentScreen() {
   /* ================= PAYMENT ================= */
 
   const confirmPayment = async () => {
-    if (method === "CASH" && (paidNum < total && Math.abs(paidNum - total) > 0.01)) {
+    if (isCashMethod(method) && (paidNum < total && Math.abs(paidNum - total) > 0.01)) {
       showToast({ type: "warning", message: "Insufficient Payment", subtitle: `Please enter at least $${total.toFixed(2)}` });
       return;
     }
@@ -338,8 +460,7 @@ export default function PaymentScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={[styles.mainLayout, !showOrderPanel && styles.mobileLayout]}>
+            <View style={[styles.mainLayout, !showOrderPanel && styles.mobileLayout]}>
                 {/* LEFT: TOTALS */}
                 <View style={[styles.leftPane, !showOrderPanel && { flex: 0 }]}>
                   <Text style={styles.sectionLabel}>Amount Due</Text>
@@ -370,82 +491,188 @@ export default function PaymentScreen() {
                 {/* CENTER: PAYMENT METHOD & CASH INPUT */}
                 <View style={styles.centerPane}>
                   <Text style={styles.sectionLabel}>Select Payment Method</Text>
-                  <View style={styles.methodRow}>
-                    {[
-                      { id: "CASH", icon: "money-bill-wave" },
-                      { id: "CARD", icon: "credit-card" },
-                      { id: "NETS", icon: "exchange-alt" },
-                      { id: "PAYNOW", icon: "qrcode" },
-                    ].map((m) => (
-                      <TouchableOpacity
-                        key={m.id}
-                        style={[styles.methodCard, method === m.id && styles.activeMethod]}
-                        onPress={() => setMethod(m.id)}
-                        activeOpacity={0.7}
-                      >
-                        <FontAwesome5
-                          name={m.icon}
-                          size={24}
-                          color={method === m.id ? "#fff" : Theme.textMuted}
-                        />
-                        <Text style={[styles.methodText, method === m.id && { color: "#fff" }]}>{m.id}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
 
-                  {method === "CASH" && (
-                    <View style={styles.cashSection}>
-                      <Text style={styles.sectionLabel}>Cash Received</Text>
-                      <View style={styles.cashInputBox}>
-                        <Text style={styles.currency}>$</Text>
-                        <TextInput
-                          style={styles.cashInput as any}
-                          keyboardType="numeric"
-                          value={cashInput}
-                          onChangeText={setCashInput}
-                          placeholder={`${total.toFixed(2)}`}
-                          placeholderTextColor={Theme.textMuted}
-                          autoFocus={!isMobile}
-                        />
-                      </View>
-
-                      <View style={styles.quickGrid}>
-                        {quickCash.map((v) => {
-                          const isSelected = Math.abs(paidNum - v) < 0.01;
-                          return (
-                            <TouchableOpacity
-                              key={v}
-                              style={[styles.quickBtn, isSelected && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
-                              onPress={() => setCashInput(v.toFixed(2))}
-                            >
-                              <Text style={[styles.quickText, isSelected && { color: "#fff" }]}>${v}</Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                        
-                        {(() => {
-                          const isExact = Math.abs(paidNum - total) < 0.01;
-                          return (
-                            <TouchableOpacity
-                              style={[styles.quickBtn, isExact && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
-                              onPress={() => setCashInput(total.toFixed(2))}
-                            >
-                              <Text style={[styles.quickText, isExact && { color: "#fff" }]}>Exact</Text>
-                            </TouchableOpacity>
-                          );
-                        })()}
-                      </View>
-
-                      <View style={styles.changeBox}>
-                        <Text style={styles.changeLabel}>Change to Return</Text>
-                        <Text style={styles.changeValue}>${change.toFixed(2)}</Text>
-                      </View>
+                  {loadingMethods ? (
+                    <View style={styles.methodsLoading}>
+                      <ActivityIndicator color={Theme.primary} />
+                      <Text style={styles.methodsLoadingText}>Loading...</Text>
+                    </View>
+                  ) : (
+                    /* 
+                     * NOTE: We use View + map() instead of FlatList here.
+                     * FlatList inside TouchableWithoutFeedback swallows onPress
+                     * events from child TouchableOpacity items — making them
+                     * appear non-clickable. View + map() has no such issue.
+                     */
+                    <View style={styles.methodGrid}>
+                      {(() => {
+                        const rows: PaymentMethod[][] = [];
+                        for (let i = 0; i < paymentMethods.length; i += 2) {
+                          rows.push(paymentMethods.slice(i, i + 2));
+                        }
+                        return rows.map((row, rowIdx) => (
+                          <View key={rowIdx} style={styles.methodColumnWrapper}>
+                            {row.map((m) => (
+                              <TouchableOpacity
+                                key={m.payMode}
+                                style={[
+                                  styles.methodCard,
+                                  method === m.payMode && styles.activeMethod,
+                                ]}
+                                onPress={() => handleSelectMethod(m)}
+                                activeOpacity={0.7}
+                              >
+                                <FontAwesome5
+                                  name={m.icon}
+                                  size={20}
+                                  color={method === m.payMode ? "#fff" : Theme.textMuted}
+                                />
+                                <Text
+                                  style={[styles.methodText, method === m.payMode && { color: "#fff" }]}
+                                  numberOfLines={1}
+                                >
+                                  {m.description}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                            {/* Pad last row if odd number of items */}
+                            {row.length === 1 && <View style={styles.methodCardEmpty} />}
+                          </View>
+                        ));
+                      })()}
                     </View>
                   )}
 
+                  {/* ─── PAYMENT METHOD DETAIL PANEL ─── */}
+                  {(() => {
+                    // Use live fetched detail, fallback to selected in list
+                    const sel = selectedDetail || paymentMethods.find((m) => m.payMode === method);
+                    if (!sel) return null;
+
+                    if (isCashMethod(method)) {
+                      // Cash: show cash input + quick amounts + change
+                      return (
+                        <View style={styles.cashSection}>
+                          <Text style={styles.sectionLabel}>Cash Received</Text>
+                          <View style={styles.cashInputBox}>
+                            <Text style={styles.currency}>$</Text>
+                            <TextInput
+                              style={styles.cashInput as any}
+                              keyboardType="numeric"
+                              value={cashInput}
+                              onChangeText={setCashInput}
+                              placeholder={`${total.toFixed(2)}`}
+                              placeholderTextColor={Theme.textMuted}
+                              autoFocus={!isMobile}
+                            />
+                          </View>
+
+                          <View style={styles.quickGrid}>
+                            {quickCash.map((v) => {
+                              const isSelected = Math.abs(paidNum - v) < 0.01;
+                              return (
+                                <TouchableOpacity
+                                  key={v}
+                                  style={[styles.quickBtn, isSelected && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
+                                  onPress={() => setCashInput(v.toFixed(2))}
+                                >
+                                  <Text style={[styles.quickText, isSelected && { color: "#fff" }]}>${v}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                            {(() => {
+                              const isExact = Math.abs(paidNum - total) < 0.01;
+                              return (
+                                <TouchableOpacity
+                                  style={[styles.quickBtn, isExact && { backgroundColor: Theme.primary, borderColor: Theme.primary }]}
+                                  onPress={() => setCashInput(total.toFixed(2))}
+                                >
+                                  <Text style={[styles.quickText, isExact && { color: "#fff" }]}>Exact</Text>
+                                </TouchableOpacity>
+                              );
+                            })()}
+                          </View>
+
+                          <View style={styles.changeBox}>
+                            <Text style={styles.changeLabel}>Change to Return</Text>
+                            <Text style={styles.changeValue}>${change.toFixed(2)}</Text>
+                          </View>
+                        </View>
+                      );
+                    }
+
+                    // Non-cash: show live DB-fetched detail panel
+                    if (loadingDetail) {
+                      return (
+                        <View style={styles.methodsLoading}>
+                          <ActivityIndicator color={Theme.primary} />
+                          <Text style={styles.methodsLoadingText}>Loading details...</Text>
+                        </View>
+                      );
+                    }
+
+                    const detailRows = [
+                      { label: "Payment Mode",   value: sel.payMode        || "—" },
+                      { label: "Description",    value: sel.description    || "—" },
+                      { label: "Commission",      value: `${(sel.commission    ?? 0).toFixed(2)}%` },
+                      { label: "Service Charge",  value: `${(sel.serviceCharge ?? 0).toFixed(2)}%` },
+                      { label: "Type",            value: sel.isEntertainment ? "Entertainment" : sel.isVoucher ? "Voucher" : "Standard" },
+                      { label: "Amount Due",      value: `$${total.toFixed(2)}`, highlight: true },
+                    ];
+
+                    return (
+                      <View style={styles.methodDetailPanel}>
+                        {/* Header row */}
+                        <View style={styles.methodDetailHeader}>
+                          <FontAwesome5 name={sel.icon} size={22} color={Theme.primary} />
+                          <Text style={styles.methodDetailTitle}>{sel.description}</Text>
+                          <View style={[styles.methodDetailBadge, { backgroundColor: Theme.primaryLight, borderColor: Theme.primaryBorder }]}>
+                            <Text style={[styles.methodDetailBadgeText, { color: Theme.primary }]}>ACTIVE</Text>
+                          </View>
+                        </View>
+
+                        {/* Column header row */}
+                        <View style={styles.detailTableHeader}>
+                          <Text style={[styles.detailCol, styles.detailColHeader]}>FIELD</Text>
+                          <Text style={[styles.detailColValue, styles.detailColHeader]}>VALUE</Text>
+                        </View>
+
+                        {/* Data rows */}
+                        {detailRows.map((row, i) => (
+                          <View
+                            key={row.label}
+                            style={[
+                              styles.detailTableRow,
+                              i % 2 === 0 && styles.detailTableRowAlt,
+                              row.highlight && styles.detailTableRowHighlight,
+                            ]}
+                          >
+                            <Text style={[styles.detailCol, row.highlight && styles.detailHighlightLabel]}>
+                              {row.label}
+                            </Text>
+                            <Text style={[styles.detailColValue, row.highlight && styles.detailHighlightValue]}>
+                              {row.value}
+                            </Text>
+                          </View>
+                        ))}
+
+                        {/* Confirm note */}
+                        <View style={styles.methodConfirmNote}>
+                          <Ionicons name="information-circle-outline" size={14} color={Theme.textMuted} />
+                          <Text style={styles.methodConfirmNoteText}>
+                            Press "Complete Settlement" to confirm payment via {sel.description}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })()}
+
                   <TouchableOpacity
-                    style={[styles.confirmBtn, method === "CASH" && paidNum < total && Math.abs(paidNum - total) > 0.01 && styles.disabled]}
-                    disabled={processing || (method === "CASH" && paidNum < total && Math.abs(paidNum - total) > 0.01)}
+                    style={[
+                      styles.confirmBtn,
+                      isCashMethod(method) && paidNum < total && Math.abs(paidNum - total) > 0.01 && styles.disabled
+                    ]}
+                    disabled={processing || (isCashMethod(method) && paidNum < total && Math.abs(paidNum - total) > 0.01)}
                     onPress={confirmPayment}
                     activeOpacity={0.8}
                   >
@@ -470,11 +697,11 @@ export default function PaymentScreen() {
 
                     <FlatList
                       data={cart}
-                      keyExtractor={(item, index) => index.toString()}
+                      keyExtractor={(_item: any, index: number) => index.toString()}
                       renderItem={renderItem}
                       showsVerticalScrollIndicator={false}
                       style={styles.itemsList}
-                      scrollEnabled={false} // Container is already scrollable
+                      scrollEnabled={false}
                     />
 
                     <View style={styles.receiptDivider} />
@@ -484,8 +711,7 @@ export default function PaymentScreen() {
                     </View>
                   </View>
                 )}
-              </View>
-            </TouchableWithoutFeedback>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
 
@@ -622,24 +848,46 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.extraBold,
   },
 
-  methodRow: {
+  methodGrid: {
+    marginBottom: 16,
+  },
+  methodColumnWrapper: {
     flexDirection: "row",
-    gap: 12,
-    marginBottom: 25,
+    gap: 10,
+    marginBottom: 10,
   },
   methodCard: {
     flex: 1,
-    height: 60,
-    borderRadius: 12,
+    height: 70,
+    borderRadius: 14,
     backgroundColor: Theme.bgMuted,
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Theme.border,
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  methodsLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    height: 70,
+    marginBottom: 16,
+  },
+  methodsLoadingText: {
+    color: Theme.textMuted,
+    fontFamily: Fonts.medium,
+    fontSize: 14,
   },
   activeMethod: {
     backgroundColor: Theme.primary,
     borderColor: Theme.primary,
+  },
+  methodCardEmpty: {
+    flex: 1,
+    // Invisible placeholder to keep the last row aligned in a 2-column grid
   },
   methodText: {
     marginTop: 6,
@@ -648,9 +896,124 @@ const styles = StyleSheet.create({
     color: Theme.textSecondary,
   },
 
+  /* ── Method Detail Panel (DB-driven, non-cash) ── */
+  methodDetailPanel: {
+    marginTop: 4,
+    marginBottom: 16,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Theme.border,
+    backgroundColor: Theme.bgCard,
+  },
+  methodDetailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 14,
+    backgroundColor: Theme.primaryLight,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.primaryBorder,
+  },
+  methodDetailTitle: {
+    flex: 1,
+    color: Theme.primary,
+    fontFamily: Fonts.black,
+    fontSize: 16,
+    letterSpacing: 0.3,
+  },
+  methodDetailBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  methodDetailBadgeText: {
+    fontFamily: Fonts.bold,
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+
+  /* Table: column header */
+  detailTableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: Theme.bgMuted,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.border,
+  },
+  detailColHeader: {
+    fontFamily: Fonts.extraBold,
+    fontSize: 11,
+    color: Theme.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+
+  /* Table: data rows */
+  detailTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Theme.border,
+  },
+  detailTableRowAlt: {
+    backgroundColor: Theme.bgMain,
+  },
+  detailTableRowHighlight: {
+    backgroundColor: Theme.primaryLight,
+    borderBottomColor: Theme.primaryBorder,
+  },
+
+  /* Table: columns */
+  detailCol: {
+    flex: 1,
+    color: Theme.textSecondary,
+    fontFamily: Fonts.medium,
+    fontSize: 13,
+  },
+  detailColValue: {
+    flex: 1,
+    color: Theme.textPrimary,
+    fontFamily: Fonts.bold,
+    fontSize: 14,
+    textAlign: "right",
+  },
+  detailHighlightLabel: {
+    color: Theme.primary,
+    fontFamily: Fonts.bold,
+    fontSize: 14,
+  },
+  detailHighlightValue: {
+    color: Theme.primary,
+    fontFamily: Fonts.black,
+    fontSize: 20,
+  },
+
+  /* Confirm note */
+  methodConfirmNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    padding: 12,
+    backgroundColor: Theme.bgMuted,
+  },
+  methodConfirmNoteText: {
+    flex: 1,
+    color: Theme.textMuted,
+    fontFamily: Fonts.medium,
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+
   cashSection: {
     marginTop: 10,
   },
+
   cashInputBox: {
     flexDirection: "row",
     alignItems: "center",
