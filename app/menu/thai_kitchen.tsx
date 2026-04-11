@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Keyboard,
   Platform,
   ScrollView,
   StatusBar,
@@ -15,8 +16,6 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
-  Keyboard,
-  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import CartSidebar from "../../components/CartSidebar";
@@ -29,7 +28,7 @@ import {
   useCartStore,
 } from "../../stores/cartStore";
 import { useOrderContextStore } from "../../stores/orderContextStore";
- 
+
 const IMAGE_BASE_URL = `${API_URL}/images/`;
 
 // --- COMPONENTS ---
@@ -78,50 +77,102 @@ const NavRail = () => {
   );
 };
 
-const DishCard = React.memo(({ dish, width, cartQty, onPress, isPhone }: any) => {
-  return (
-    <TouchableOpacity
-      style={[styles.card, { width, padding: isPhone ? 8 : 10 }]}
-      onPress={() => onPress(dish)}
-      activeOpacity={0.7}
-    >
-      {cartQty > 0 && (
-        <View style={[styles.qtyBadge, isPhone && { width: 22, height: 22, borderRadius: 11 }]}>
-          <Text style={[styles.qtyBadgeText, isPhone && { fontSize: 11 }]}>{cartQty}</Text>
-        </View>
-      )}
-      <View style={[styles.dishImageWrap, isPhone && { width: 50, height: 50, marginBottom: 8 }]}>
-        {dish.Image ? (
-          <Image
-            source={{ uri: `${IMAGE_BASE_URL}${dish.Image}` }}
-            style={styles.dishImg}
-          />
-        ) : (
+const DishCard = React.memo(
+  ({ dish, width, cartQty, onPress, isPhone, isTablet }: any) => {
+    return (
+      <TouchableOpacity
+        style={[
+          styles.card,
+          { width, padding: isPhone ? 8 : isTablet ? 12 : 10 },
+        ]}
+        onPress={() => onPress(dish)}
+        activeOpacity={0.7}
+      >
+        {cartQty > 0 && (
           <View
             style={[
-              styles.dishImg,
-              {
-                justifyContent: "center",
-                alignItems: "center",
-                backgroundColor: Theme.bgMuted,
-              },
+              styles.qtyBadge,
+              isPhone
+                ? { width: 22, height: 22, borderRadius: 11 }
+                : isTablet
+                  ? { width: 32, height: 32, borderRadius: 16 }
+                  : null,
             ]}
           >
-            <Ionicons
-              name="restaurant-outline"
-              size={isPhone ? 24 : 40}
-              color={Theme.textMuted}
-            />
+            <Text
+              style={[
+                styles.qtyBadgeText,
+                isPhone ? { fontSize: 11 } : isTablet ? { fontSize: 15 } : null,
+              ]}
+            >
+              {cartQty}
+            </Text>
           </View>
         )}
-      </View>
-      <Text style={[styles.dishName, isPhone && { fontSize: 11, minHeight: 32, lineHeight: 14 }]} numberOfLines={2}>
-        {dish.Name}
-      </Text>
-      <Text style={[styles.dishPrice, isPhone && { fontSize: 12 }]}>${(dish.Price || 0).toFixed(2)}</Text>
-    </TouchableOpacity>
-  );
-});
+        <View
+          style={[
+            styles.dishImageWrap,
+            isPhone
+              ? { width: 50, height: 50, marginBottom: 8 }
+              : isTablet
+                ? {
+                    width: 85,
+                    height: 85,
+                    marginBottom: 12,
+                    borderRadius: 42.5,
+                  }
+                : null,
+          ]}
+        >
+          {dish.Image ? (
+            <Image
+              source={{ uri: `${IMAGE_BASE_URL}${dish.Image}` }}
+              style={styles.dishImg}
+            />
+          ) : (
+            <View
+              style={[
+                styles.dishImg,
+                {
+                  justifyContent: "center",
+                  alignItems: "center",
+                  backgroundColor: Theme.bgMuted,
+                },
+              ]}
+            >
+              <Ionicons
+                name="restaurant-outline"
+                size={isPhone ? 24 : isTablet ? 48 : 40}
+                color={Theme.textMuted}
+              />
+            </View>
+          )}
+        </View>
+        <Text
+          style={[
+            styles.dishName,
+            isPhone
+              ? { fontSize: 11, minHeight: 32, lineHeight: 14 }
+              : isTablet
+                ? { fontSize: 15, minHeight: 44, lineHeight: 18 }
+                : null,
+          ]}
+          numberOfLines={2}
+        >
+          {dish.Name}
+        </Text>
+        <Text
+          style={[
+            styles.dishPrice,
+            isPhone ? { fontSize: 12 } : isTablet ? { fontSize: 16 } : null,
+          ]}
+        >
+          ${(dish.Price || 0).toFixed(2)}
+        </Text>
+      </TouchableOpacity>
+    );
+  },
+);
 
 // --- SCREEN ---
 
@@ -164,12 +215,14 @@ export default function MenuScreen() {
   const isPhone = width < 600;
   const isLarge = true; // Always show cart on all devices
 
-  const cartWidth = isLandscape ? 380 : (isTabletPortrait ? 330 : width * 0.55);
+  const cartWidth = isLandscape ? 380 : isTabletPortrait ? 330 : width * 0.55;
   const mainWidth = width - cartWidth;
 
-  const columns = isLandscape ? 5 : (isPhone ? 1 : 2); // 5 for landscape, 1 for phone, 2 for tablet
+  const columns =
+    width > 1200 ? 5 : width > 900 ? 3 : isPhone ? 1 : 2; 
   const gap = isPhone ? 8 : 15; // Smaller gap for phones
-  const cardWidth = (mainWidth - (isPhone ? 20 : 60) - gap * (columns - 1)) / columns;
+  const cardWidth =
+    (mainWidth - (isPhone ? 20 : 60) - gap * (columns - 1)) / columns;
 
   const dismissKeyboard = () => Keyboard.dismiss();
 
@@ -188,8 +241,7 @@ export default function MenuScreen() {
           (k: any) => k.KitchenTypeName && !k.KitchenTypeName.includes("TEST"),
         );
         setKitchens(filtered);
-        if (filtered.length > 0)
-          loadGroups(filtered[0].CategoryId);
+        if (filtered.length > 0) loadGroups(filtered[0].CategoryId);
         setIsInitialLoading(false);
       });
 
@@ -205,7 +257,8 @@ export default function MenuScreen() {
       const res = await fetch(`${API_URL}/dishgroups/${kitchenId}`);
       const data = await res.json();
       setGroups(Array.isArray(data) ? data : []);
-      if (Array.isArray(data) && data.length > 0) loadDishes(data[0].DishGroupId);
+      if (Array.isArray(data) && data.length > 0)
+        loadDishes(data[0].DishGroupId);
     } catch (e) {
       console.log(e);
     }
@@ -274,24 +327,28 @@ export default function MenuScreen() {
     }
   }, []);
 
-  const renderDishItem = React.useCallback(({ item }: { item: any }) => {
-    const ctxId = getContextId(orderContext);
-    const currentCart = ctxId ? (carts[ctxId] || []) : [];
-    
-    const cartQty = currentCart.reduce((acc: number, cartItem: any) => {
-      return cartItem.id === item.DishId ? acc + cartItem.qty : acc;
-    }, 0);
+  const renderDishItem = React.useCallback(
+    ({ item }: { item: any }) => {
+      const ctxId = getContextId(orderContext);
+      const currentCart = ctxId ? carts[ctxId] || [] : [];
 
-    return (
-      <DishCard
-        dish={item}
-        width={cardWidth}
-        cartQty={cartQty}
-        onPress={openModifiers}
-        isPhone={isPhone}
-      />
-    );
-  }, [orderContext, carts, cardWidth, openModifiers]);
+      const cartQty = currentCart.reduce((acc: number, cartItem: any) => {
+        return cartItem.id === item.DishId ? acc + cartItem.qty : acc;
+      }, 0);
+
+      return (
+        <DishCard
+          dish={item}
+          width={cardWidth}
+          cartQty={cartQty}
+          onPress={openModifiers}
+          isPhone={isPhone}
+          isTablet={isTabletPortrait}
+        />
+      );
+    },
+    [orderContext, carts, cardWidth, openModifiers],
+  );
 
   const toggleModifier = (mod: any) => {
     if (mod.ModifierName.toUpperCase() === "OPEN") {
@@ -316,8 +373,8 @@ export default function MenuScreen() {
       Price: parseFloat(customItemPrice) || 0,
     };
 
-    setCustomMods(prev => [...prev, newMod]);
-    setSelectedModifierIds(prev => [...prev, newId]);
+    setCustomMods((prev) => [...prev, newMod]);
+    setSelectedModifierIds((prev) => [...prev, newId]);
 
     setShowCustomModal(false);
     setCustomItemName("");
@@ -330,7 +387,7 @@ export default function MenuScreen() {
       const selectedMods = allAvailable.filter((m) =>
         selectedModifierIds.includes(m.ModifierID),
       );
-      
+
       const modsToAdd = selectedMods.map((m) => ({
         ModifierId: m.ModifierID || m.ModifierId,
         ModifierName: m.ModifierName,
@@ -345,7 +402,7 @@ export default function MenuScreen() {
         name: selectedDish.Name,
         price: finalPrice,
         modifiers: modsToAdd as any,
-        basePrice: selectedDish.Price || 0
+        basePrice: selectedDish.Price || 0,
       });
     }
     setShowModifier(false);
@@ -374,11 +431,7 @@ export default function MenuScreen() {
         />
         {searchText.length > 0 && (
           <TouchableOpacity onPress={() => setSearchText("")}>
-            <Ionicons
-              name="close-circle"
-              size={18}
-              color={Theme.textMuted}
-            />
+            <Ionicons name="close-circle" size={18} color={Theme.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -441,8 +494,7 @@ export default function MenuScreen() {
               <Text
                 style={[
                   styles.groupText,
-                  selectedGroup === g.DishGroupId &&
-                    styles.groupTextActive,
+                  selectedGroup === g.DishGroupId && styles.groupTextActive,
                 ]}
               >
                 {g.DishGroupName}
@@ -473,7 +525,10 @@ export default function MenuScreen() {
               {renderCategoryNav()}
               <View style={styles.gridContainer}>
                 {isLoadingDishes ? (
-                  <ActivityIndicator color={Theme.primary} style={{ marginTop: 50 }} />
+                  <ActivityIndicator
+                    color={Theme.primary}
+                    style={{ marginTop: 50 }}
+                  />
                 ) : (
                   <FlatList
                     data={filteredItems}
@@ -481,8 +536,13 @@ export default function MenuScreen() {
                     numColumns={columns}
                     key={columns}
                     renderItem={renderDishItem}
-                    columnWrapperStyle={columns > 1 ? { gap: gap, marginBottom: gap } : undefined}
-                    contentContainerStyle={[styles.listPadding, columns === 1 && { gap: gap }]}
+                    columnWrapperStyle={
+                      columns > 1 ? { gap: gap, marginBottom: gap } : undefined
+                    }
+                    contentContainerStyle={[
+                      styles.listPadding,
+                      columns === 1 && { gap: gap },
+                    ]}
                     showsVerticalScrollIndicator={false}
                   />
                 )}
@@ -499,10 +559,22 @@ export default function MenuScreen() {
             </View>
 
             <View style={[styles.layout, { flex: 1 }]}>
-              <View style={[styles.main, { width: mainWidth, paddingTop: 0, paddingHorizontal: isPhone ? 10 : 20 }]}>
+              <View
+                style={[
+                  styles.main,
+                  {
+                    width: mainWidth,
+                    paddingTop: 0,
+                    paddingHorizontal: isPhone ? 10 : 20,
+                  },
+                ]}
+              >
                 <View style={styles.gridContainer}>
                   {isLoadingDishes ? (
-                    <ActivityIndicator color={Theme.primary} style={{ marginTop: 50 }} />
+                    <ActivityIndicator
+                      color={Theme.primary}
+                      style={{ marginTop: 50 }}
+                    />
                   ) : (
                     <FlatList
                       data={filteredItems}
@@ -510,8 +582,15 @@ export default function MenuScreen() {
                       numColumns={columns}
                       key={columns}
                       renderItem={renderDishItem}
-                      columnWrapperStyle={columns > 1 ? { gap: gap, marginBottom: gap } : undefined}
-                      contentContainerStyle={[styles.listPadding, columns === 1 && { gap: gap }]}
+                      columnWrapperStyle={
+                        columns > 1
+                          ? { gap: gap, marginBottom: gap }
+                          : undefined
+                      }
+                      contentContainerStyle={[
+                        styles.listPadding,
+                        columns === 1 && { gap: gap },
+                      ]}
                       showsVerticalScrollIndicator={false}
                     />
                   )}
@@ -548,7 +627,10 @@ export default function MenuScreen() {
                 {loadingModifiers ? (
                   <ActivityIndicator color={Theme.primary} size="large" />
                 ) : (
-                  <ScrollView style={styles.modifierList} showsVerticalScrollIndicator={false}>
+                  <ScrollView
+                    style={styles.modifierList}
+                    showsVerticalScrollIndicator={false}
+                  >
                     {modifiers.map((m) => (
                       <TouchableOpacity
                         key={m.ModifierID}
