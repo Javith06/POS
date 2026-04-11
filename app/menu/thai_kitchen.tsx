@@ -113,13 +113,13 @@ const DishCard = React.memo(
           style={[
             styles.dishImageWrap,
             isPhone
-              ? { width: 50, height: 50, marginBottom: 8 }
+              ? { width: 50, height: 50, marginBottom: 4 }
               : isTablet
                 ? {
-                    width: 85,
-                    height: 85,
-                    marginBottom: 12,
-                    borderRadius: 42.5,
+                    width: 75,
+                    height: 75,
+                    marginBottom: 6,
+                    borderRadius: 37.5,
                   }
                 : null,
           ]}
@@ -152,9 +152,9 @@ const DishCard = React.memo(
           style={[
             styles.dishName,
             isPhone
-              ? { fontSize: 11, minHeight: 32, lineHeight: 14 }
+              ? { fontSize: 11, minHeight: 28, lineHeight: 14 }
               : isTablet
-                ? { fontSize: 15, minHeight: 44, lineHeight: 18 }
+                ? { fontSize: 13, minHeight: 36, lineHeight: 16 }
                 : null,
           ]}
           numberOfLines={2}
@@ -164,7 +164,7 @@ const DishCard = React.memo(
         <Text
           style={[
             styles.dishPrice,
-            isPhone ? { fontSize: 12 } : isTablet ? { fontSize: 16 } : null,
+            isPhone ? { fontSize: 12 } : isTablet ? { fontSize: 14 } : null,
           ]}
         >
           ${(dish.Price || 0).toFixed(2)}
@@ -218,11 +218,10 @@ export default function MenuScreen() {
   const cartWidth = isLandscape ? 380 : isTabletPortrait ? 330 : width * 0.55;
   const mainWidth = width - cartWidth;
 
-  const columns =
-    width > 1200 ? 5 : width > 900 ? 3 : isPhone ? 1 : 2; 
-  const gap = isPhone ? 8 : 15; // Smaller gap for phones
+  const columns = width > 1200 ? 5 : width > 900 ? 3 : isPhone ? 1 : 2;
+  const gap = isPhone ? 8 : 12; // Smaller gap for phones
   const cardWidth =
-    (mainWidth - (isPhone ? 20 : 60) - gap * (columns - 1)) / columns;
+    (mainWidth - (isPhone ? 20 : 40) - gap * (columns - 1)) / columns;
 
   const dismissKeyboard = () => Keyboard.dismiss();
 
@@ -885,7 +884,7 @@ const styles = StyleSheet.create({
     height: 70,
     borderRadius: 35,
     overflow: "hidden",
-    marginBottom: 12,
+    marginBottom: 8,
     backgroundColor: Theme.bgMain,
   },
   dishImg: { width: "100%", height: "100%" },
@@ -894,7 +893,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.black,
     color: Theme.textPrimary,
     textAlign: "center",
-    minHeight: 40,
+    minHeight: 36,
     lineHeight: 18,
   },
   dishPrice: {
