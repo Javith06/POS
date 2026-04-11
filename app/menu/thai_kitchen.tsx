@@ -825,12 +825,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   catPillActive: {
-    backgroundColor: Theme.primaryLight,
+    backgroundColor: Theme.primary,
     borderColor: Theme.primary,
     ...Theme.shadowSm,
   },
   catText: { fontSize: 14, fontFamily: Fonts.bold, color: Theme.textSecondary },
-  catTextActive: { color: Theme.primary },
+  catTextActive: { color: "#fff" },
   groupScroll: { gap: 8 },
   groupPill: {
     paddingHorizontal: 16,

@@ -49,6 +49,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [itemToEdit, setItemToEdit] = useState<CartItem | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [itemToVoid, setItemToVoid] = useState<any | null>(null);
   const [cancelPassword, setCancelPassword] = useState("");
 
   const orderContext = useOrderContextStore((state) => state.currentOrder);
@@ -71,6 +72,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
   const closeActiveOrder = useActiveOrdersStore(
     (state) => state.closeActiveOrder,
   );
+  const voidOrderItem = useActiveOrdersStore((state) => state.voidOrderItem);
   const updateTableStatus = useTableStatusStore((s) => s.updateTableStatus);
   const tables = useTableStatusStore((s) => s.tables);
 
@@ -115,7 +117,11 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
 
   const subtotal = useMemo(() => {
     return displayItems.reduce(
-      (sum, item) => sum + (item.price || 0) * item.qty,
+      (sum, item) => {
+        const isVoided = "status" in item && item.status === "VOIDED";
+        if (isVoided) return sum;
+        return sum + (item.price || 0) * item.qty;
+      },
       0,
     );
   }, [displayItems]);
@@ -196,6 +202,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
 
   const renderItem = ({ item, index }: { item: any; index: number }) => {
     const isSent = "status" in item && item.status === "SENT";
+    const isVoided = "status" in item && item.status === "VOIDED";
     const isExpanded = expandedItemId === item.lineItemId;
 
     return (
@@ -230,7 +237,11 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
           <View style={styles.itemInfo}>
             <View style={styles.itemMainRow}>
               <Text
-                style={[styles.itemName, isSent && styles.textMuted]}
+                style={[
+                  styles.itemName,
+                  (isSent || isVoided) && styles.textMuted,
+                  isVoided && styles.strikeThrough,
+                ]}
                 numberOfLines={1}
               >
                 {item.name}
@@ -249,10 +260,16 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
                 <Text
                   style={[
                     styles.statusTagText,
-                    { color: isSent ? "#15803D" : "#1D4ED8" },
+                    {
+                      color: isVoided
+                        ? Theme.danger
+                        : isSent
+                        ? "#15803D"
+                        : "#1D4ED8",
+                    },
                   ]}
                 >
-                  {isSent ? "✅ SENT" : "🔵 NEW"}
+                  {isVoided ? "❌ VOIDED" : isSent ? "✅ SENT" : "🔵 NEW"}
                 </Text>
               </View>
             </View>
@@ -274,8 +291,8 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
 
             {/* INLINE QTY CONTROL ON MAIN ROW */}
             <View style={styles.inlineControls}>
-              {isSent ? (
-                <Text style={styles.sentQtyText}>×{item.qty}</Text>
+              {isSent || isVoided ? (
+                <Text style={styles.sentQtyText}>QTY: {item.qty}</Text>
               ) : (
                 <View style={styles.qtyControlSmall}>
                   <TouchableOpacity
@@ -305,30 +322,49 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
               )}
 
               <View style={styles.priceContainer}>
-                <Text style={[styles.itemPrice, isSent && styles.textMuted]}>
-                  $
-                  {(
-                    item.price *
-                    item.qty *
-                    (1 - (item.discount || 0) / 100)
-                  ).toFixed(2)}
+                <Text
+                  style={[
+                    styles.itemPrice,
+                    isVoided && styles.strikeThrough,
+                    isVoided && styles.textMuted,
+                  ]}
+                >
+                  ${((item.price || 0) * item.qty).toFixed(2)}
                 </Text>
 
-                {!isSent && (
+                {isSent && !isVoided ? (
                   <TouchableOpacity
                     style={styles.deleteBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      removeFromCartGlobal(item.lineItemId);
+                    onPress={() => {
+                      setItemToVoid(item);
+                      setShowCancelModal(true);
                     }}
                   >
                     <Ionicons
-                      name="close-circle"
+                      name="trash-outline"
                       size={18}
                       color={Theme.danger}
                     />
                   </TouchableOpacity>
-                )}
+                ) : !isSent && !isVoided ? (
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => {
+                      removeFromCartGlobal(item.lineItemId);
+                      showToast({
+                        type: "info",
+                        message: "Removed",
+                        subtitle: `${item.name} deleted`,
+                      });
+                    }}
+                  >
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={18}
+                      color={Theme.textMuted}
+                    />
+                  </TouchableOpacity>
+                ) : null}
               </View>
             </View>
           </View>
@@ -454,7 +490,30 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalBtnConfirm}
-                onPress={() => cancelPassword === "786" && clearCart()}
+                onPress={() => {
+                  if (cancelPassword === "786") {
+                    if (itemToVoid && activeOrder) {
+                      voidOrderItem(activeOrder.orderId, itemToVoid.lineItemId);
+                      setItemToVoid(null);
+                      setCancelPassword("");
+                      setShowCancelModal(false);
+                      showToast({
+                        type: "success",
+                        message: "Item Voided",
+                        subtitle: "Sent items updated",
+                      });
+                    } else {
+                      clearCart();
+                      setCancelPassword("");
+                      setShowCancelModal(false);
+                    }
+                  } else {
+                    showToast({
+                      type: "error",
+                      message: "Invalid Password",
+                    });
+                  }
+                }}
               >
                 <Text style={styles.modalBtnTextConfirm}>Confirm</Text>
               </TouchableOpacity>
@@ -752,5 +811,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: Fonts.black,
     color: Theme.danger,
+  },
+  strikeThrough: {
+    textDecorationLine: "line-through",
   },
 });

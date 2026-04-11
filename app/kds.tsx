@@ -70,7 +70,9 @@ export default function KDSScreen() {
   const kitchenOrders = useMemo(() => {
     return activeOrders
       .map((order) => {
-        const sentItems = order.items.filter((i: any) => i.status === "SENT");
+        const sentItems = order.items.filter(
+          (i: any) => i.status === "SENT" || i.status === "VOIDED",
+        );
         if (sentItems.length === 0) return null;
         return { ...order, items: sentItems };
       })
@@ -141,8 +143,21 @@ export default function KDSScreen() {
                   <View style={styles.itemQtyWrap}>
                     <Text style={styles.itemQty}>{i.qty}×</Text>
                   </View>
-                  <Text style={styles.itemText} numberOfLines={2}>{i.name}</Text>
-                  {i.isTakeaway && (
+                  <Text
+                    style={[
+                      styles.itemText,
+                      i.status === "VOIDED" && styles.itemVoidedText,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {i.name}
+                  </Text>
+                  {i.status === "VOIDED" && (
+                    <View style={styles.voidBadge}>
+                      <Text style={styles.voidBadgeText}>CANCELLED</Text>
+                    </View>
+                  )}
+                  {i.isTakeaway && i.status !== "VOIDED" && (
                     <View style={styles.twBadge}>
                       <Text style={styles.twBadgeText}>TAKE AWAY</Text>
                     </View>
@@ -314,5 +329,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.black,
     color: Theme.danger,
+  },
+  itemVoidedText: {
+    color: Theme.danger,
+    textDecorationLine: "line-through",
+    opacity: 0.8,
+  },
+  voidBadge: {
+    backgroundColor: Theme.danger,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginLeft: 8,
+  },
+  voidBadgeText: {
+    color: "#fff",
+    fontFamily: Fonts.black,
+    fontSize: 10,
+    textTransform: "uppercase",
   },
 });

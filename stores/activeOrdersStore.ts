@@ -5,7 +5,7 @@ import { OrderContext } from "./orderContextStore";
 /* ================= TYPES ================= */
 
 export type OrderItem = CartItem & {
-  status: "NEW" | "SENT";
+  status: "NEW" | "SENT" | "VOIDED";
   sentAt?: number;
 };
 
@@ -30,8 +30,9 @@ type ActiveOrdersState = {
   markItemsSent: (orderId: string) => void;
   closeActiveOrder: (orderId: string) => void;
 
-  // 🔥 NEW FUNCTION
+  // 🔥 NEW FUNCTIONS
   updateOrderDiscount: (context: OrderContext, discount: DiscountInfo) => void;
+  voidOrderItem: (orderId: string, lineItemId: string) => void;
 };
 
 /* ================= STORE ================= */
@@ -176,14 +177,33 @@ export const useActiveOrdersStore = create<ActiveOrdersState>((set, get) => ({
       }),
     });
   },
-
-  /* ================= CLOSE ORDER ================= */
-
   closeActiveOrder: (orderId) => {
     const { activeOrders } = get();
 
     set({
       activeOrders: activeOrders.filter((o) => o.orderId !== orderId),
+    });
+  },
+
+  /* ================= VOID ITEM ================= */
+
+  voidOrderItem: (orderId, lineItemId) => {
+    const { activeOrders } = get();
+
+    set({
+      activeOrders: activeOrders.map((order) => {
+        if (order.orderId !== orderId) return order;
+
+        return {
+          ...order,
+          items: order.items.map((item) => {
+            if (item.lineItemId === lineItemId) {
+              return { ...item, status: "VOIDED" };
+            }
+            return item;
+          }),
+        };
+      }),
     });
   },
 }));

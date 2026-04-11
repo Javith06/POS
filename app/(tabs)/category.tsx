@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
   StatusBar,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Fonts } from "../../constants/Fonts";
@@ -28,6 +29,14 @@ import { getHeldOrders, removeHeldOrder } from "../../stores/heldOrdersStore";
 import { setOrderContext } from "../../stores/orderContextStore";
 import { useTableStatusStore } from "../../stores/tableStatusStore";
 import { useAuthStore } from "../../stores/authStore";
+
+// --- MOBILE SOLID COLORS ---
+const IS_MOBILE = Platform.OS !== 'web';
+const SOLID_LIGHT_GREEN = '#F0FDF4'; 
+const SOLID_LIGHT_RED   = '#FEF2F2';
+const SOLID_LIGHT_BLUE  = '#F0F9FF';
+const SOLID_LIGHT_AMBER = '#FFFBEB';
+const SOLID_LIGHT_ORANGE = '#FFF7ED';
 
 // --- MEMOIZED TABLE COMPONENT ---
 const TableItemComponent = React.memo(({ 
@@ -61,14 +70,14 @@ const TableItemComponent = React.memo(({
 
     switch (tableData.status) {
       case "LOCKED":
-        bgColor = Theme.tableLocked.bg;
+        bgColor = IS_MOBILE ? SOLID_LIGHT_RED : Theme.tableLocked.bg;
         borderColor = Theme.tableLocked.border;
         textColor = "#B91C1C";
         statusLabel = "RESERVED";
         statusColor = "#B91C1C";
         break;
       case "HOLD":
-        bgColor = Theme.tableHold.bg;
+        bgColor = IS_MOBILE ? SOLID_LIGHT_BLUE : Theme.tableHold.bg;
         borderColor = Theme.tableHold.border;
         textColor = "#1D4ED8";
         statusLabel = "ON HOLD";
@@ -76,13 +85,13 @@ const TableItemComponent = React.memo(({
         break;
       case "SENT":
         if (elapsedMinutes >= 60) {
-          bgColor = Theme.tableSentOld.bg;
+          bgColor = IS_MOBILE ? SOLID_LIGHT_ORANGE : Theme.tableSentOld.bg;
           borderColor = Theme.tableSentOld.border;
           textColor = "#B91C1C";
           statusLabel = "OVERTIME";
           statusColor = "#B91C1C";
         } else {
-          bgColor = Theme.tableSent.bg;
+          bgColor = IS_MOBILE ? SOLID_LIGHT_GREEN : Theme.tableSent.bg;
           borderColor = Theme.tableSent.border;
           textColor = "#15803D";
           statusLabel = "DINING";
@@ -90,7 +99,7 @@ const TableItemComponent = React.memo(({
         }
         break;
       case "BILL_REQUESTED":
-        bgColor = Theme.tableBillRequest.bg;
+        bgColor = IS_MOBILE ? SOLID_LIGHT_AMBER : Theme.tableBillRequest.bg;
         borderColor = Theme.tableBillRequest.border;
         textColor = "#B45309";
         statusLabel = "CHECKOUT";
@@ -119,6 +128,8 @@ const TableItemComponent = React.memo(({
           height: itemSize,
           borderColor,
           backgroundColor: bgColor,
+          borderWidth: tableData ? 2 : 1.5,
+          elevation: tableData ? 0 : 2, // Remove elevation on active tables to fix fill artifacts
         },
       ]}
       onPress={() => onPress(item, tableData)}
