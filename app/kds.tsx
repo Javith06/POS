@@ -142,6 +142,11 @@ export default function KDSScreen() {
                     <Text style={styles.itemQty}>{i.qty}×</Text>
                   </View>
                   <Text style={styles.itemText} numberOfLines={2}>{i.name}</Text>
+                  {i.isTakeaway && (
+                    <View style={styles.twBadge}>
+                      <Text style={styles.twBadgeText}>TAKE AWAY</Text>
+                    </View>
+                  )}
                   {isNew && (
                     <Animated.View style={[styles.newBadge, { opacity: blinkAnim }]}>
                       <Text style={styles.newBadgeText}>NEW</Text>
@@ -296,4 +301,18 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: "center", marginTop: 200, gap: 15 },
   emptyText: { color: Theme.textPrimary, fontSize: 32, fontFamily: Fonts.black },
   emptySub: { color: Theme.textMuted, fontFamily: Fonts.bold, fontSize: 16 },
+  twBadge: {
+    backgroundColor: Theme.danger + "15",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: Theme.danger + "30",
+  },
+  twBadgeText: {
+    fontSize: 12,
+    fontFamily: Fonts.black,
+    color: Theme.danger,
+  },
 });

@@ -19,6 +19,7 @@ import {
 import { Fonts } from "../constants/Fonts";
 import { Theme } from "../constants/theme";
 import { useToast } from "./Toast";
+import EditDishModal from "./EditDishModal";
 
 import { OrderItem, useActiveOrdersStore } from "../stores/activeOrdersStore";
 import { CartItem, useCartStore } from "../stores/cartStore";
@@ -45,6 +46,8 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
   const isPhone = screenWidth < 600;
 
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [itemToEdit, setItemToEdit] = useState<CartItem | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelPassword, setCancelPassword] = useState("");
 
@@ -207,11 +210,16 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
 
         <Pressable
           style={styles.itemHeader}
-          onPress={() => !isSent && toggleExpand(item.lineItemId)}
+          onPress={() => {
+            if (!isSent) {
+              setItemToEdit(item);
+              setIsEditModalVisible(true);
+            }
+          }}
         >
           <View style={styles.itemIndexWrap}>
             <Ionicons
-              name={isExpanded ? "chevron-down" : "chevron-forward"}
+              name="chevron-forward"
               size={12}
               color={Theme.textMuted}
               style={styles.chevron}
@@ -227,10 +235,15 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
               >
                 {item.name}
               </Text>
+              {item.isTakeaway && (
+                <View style={styles.twBadge}>
+                  <Text style={styles.twBadgeText}>TW</Text>
+                </View>
+              )}
               <View
                 style={[
                   styles.statusTag,
-                  { backgroundColor: isSent ? "#22C55E15" : "#3B82F615" },
+                  { backgroundColor: isSent ? "#22C55E25" : "#3B82F625" },
                 ]}
               >
                 <Text
@@ -321,29 +334,7 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
           </View>
         </Pressable>
 
-        {/* EXPANDABLE DISCOUNT ONLY */}
-        {isExpanded && !isSent && (
-          <View style={styles.discountRow}>
-            <View style={styles.discountInputWrap}>
-              <Text style={styles.discountLabel}>Set Discount (%)</Text>
-              <TextInput
-                style={styles.discountInputSmall}
-                keyboardType="numeric"
-                placeholder="0"
-                value={(item.discount || 0).toString()}
-                onChangeText={(txt) =>
-                  updateCartItemQty(
-                    item.lineItemId,
-                    item.qty,
-                    parseInt(txt) || 0,
-                  )
-                }
-                selectTextOnFocus
-                maxLength={3}
-              />
-            </View>
-          </View>
-        )}
+        {/* LEGACY INLINE DISCOUNT REMOVED AS PER REQUEST */}
       </View>
     );
   };
@@ -375,12 +366,8 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
       <View style={styles.footer}>
         <View style={styles.summary}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
-          </View>
-          <View style={[styles.summaryRow, { marginTop: 8 }]}>
-            <Text style={styles.payableLabel}>Payable Amount</Text>
-            <Text style={styles.payableValue}>${payableAmount.toFixed(2)}</Text>
+            <Text style={styles.payableLabel}>Subtotal</Text>
+            <Text style={styles.payableValue}>${subtotal.toFixed(2)}</Text>
           </View>
         </View>
 
@@ -475,6 +462,16 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
           </View>
         </View>
       </Modal>
+      
+      {/* EDIT DISH MODAL */}
+      <EditDishModal
+        visible={isEditModalVisible}
+        item={itemToEdit}
+        onClose={() => {
+          setIsEditModalVisible(false);
+          setItemToEdit(null);
+        }}
+      />
     </View>
   );
 }
@@ -523,7 +520,7 @@ const styles = StyleSheet.create({
   },
   listContent: { paddingBottom: 20 },
   itemContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
     borderRadius: 12,
     backgroundColor: Theme.bgCard,
     overflow: "hidden",
@@ -539,16 +536,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 4,
   },
   itemIndexWrap: {
-    width: 42,
+    width: 32,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingLeft: 10,
-    marginRight: 12,
+    paddingLeft: 4,
+    marginRight: 8,
+    gap: 2,
   },
   chevron: { marginLeft: -4 },
   itemIndex: {
@@ -742,4 +739,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalBtnTextConfirm: { color: "#fff", fontFamily: Fonts.black },
+  twBadge: {
+    backgroundColor: Theme.danger + "15",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 6,
+    borderWidth: 1,
+    borderColor: Theme.danger + "30",
+  },
+  twBadgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.black,
+    color: Theme.danger,
+  },
 });

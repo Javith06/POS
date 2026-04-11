@@ -152,12 +152,12 @@ const DishCard = React.memo(
           style={[
             styles.dishName,
             isPhone
-              ? { fontSize: 11, minHeight: 28, lineHeight: 14 }
+              ? { fontSize: 11, minHeight: 42, lineHeight: 14 }
               : isTablet
-                ? { fontSize: 13, minHeight: 36, lineHeight: 16 }
+                ? { fontSize: 13, minHeight: 48, lineHeight: 16 }
                 : null,
           ]}
-          numberOfLines={2}
+          numberOfLines={3}
         >
           {dish.Name}
         </Text>
@@ -475,7 +475,7 @@ export default function MenuScreen() {
         ))}
       </ScrollView>
 
-      <View style={{ marginTop: 10 }}>
+      <View style={{ marginTop: 15 }}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -771,7 +771,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 15,
   },
   backBtn: {
     width: 44,
@@ -812,11 +812,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...Theme.shadowSm,
   },
-  categoryNavigation: { marginBottom: 25 },
+  categoryNavigation: { marginBottom: 15 },
   catScroll: { gap: 10 },
   catPill: {
     paddingHorizontal: 20,
-    height: 40,
+    height: 36,
     borderRadius: 12,
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -834,20 +834,21 @@ const styles = StyleSheet.create({
   groupScroll: { gap: 8 },
   groupPill: {
     paddingHorizontal: 16,
-    height: 32,
+    height: 38,
     borderRadius: full,
-    backgroundColor: "transparent",
-    borderWidth: 0,
+    backgroundColor: "#fff",
+    borderWidth: 1,
+    borderColor: Theme.border,
     justifyContent: "center",
     alignItems: "center",
   },
   groupPillActive: {
     backgroundColor: "#fff",
-    borderWidth: 1,
-    borderColor: Theme.border,
+    borderWidth: 2,
+    borderColor: Theme.primary,
     ...Theme.shadowSm,
   },
-  groupText: { fontSize: 12, fontFamily: Fonts.medium, color: Theme.textMuted },
+  groupText: { fontSize: 12, fontFamily: Fonts.medium, color: Theme.textSecondary },
   groupTextActive: { color: Theme.textPrimary, fontFamily: Fonts.bold },
   gridContainer: { flex: 1 },
   listPadding: { paddingBottom: 80 },

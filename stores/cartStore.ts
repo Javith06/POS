@@ -24,7 +24,8 @@ export type CartItem = {
 
   modifiers?: Modifier[];
   discount?: number;
-  basePrice?: number; // Added to store the original dish price for recalculation
+  basePrice?: number;
+  isTakeaway?: boolean;
 };
 
 export type DiscountInfo = {
@@ -53,8 +54,14 @@ type CartState = {
   clearDiscount: () => void;
 
   setCartItems: (contextId: string, items: CartItem[]) => void;
-  updateCartItemQty: (lineItemId: string, newQty: number, discount?: number) => void;
+  updateCartItemQty: (
+    lineItemId: string,
+    newQty: number,
+    discount?: number,
+  ) => void;
   updateCartItemModifiers: (lineItemId: string, modifiers: Modifier[]) => void;
+  updateCartItemTakeaway: (lineItemId: string, isTakeaway: boolean) => void;
+  updateCartItemDiscount: (lineItemId: string, discount: number) => void;
 };
 
 /* ================= STORE ================= */
@@ -137,7 +144,10 @@ export const useCartStore = create<CartState>((set, get) => ({
         p.lineItemId === existing.lineItemId ? { ...p, qty: p.qty + 1 } : p,
       );
     } else {
-      updatedCart = [...currentCart, { ...item, qty: 1, lineItemId: targetLineItemId, basePrice }];
+      updatedCart = [
+        ...currentCart,
+        { ...item, qty: 1, lineItemId: targetLineItemId, basePrice },
+      ];
     }
 
     const newDiscounts = { ...discounts };
@@ -218,16 +228,26 @@ export const useCartStore = create<CartState>((set, get) => ({
     }));
   },
 
-  updateCartItemQty: (lineItemId: string, newQty: number, discount?: number) => {
+  updateCartItemQty: (
+    lineItemId: string,
+    newQty: number,
+    discount?: number,
+  ) => {
     const { carts, currentContextId } = get();
     if (!currentContextId) return;
 
     const currentCart = carts[currentContextId] || [];
-    const updatedCart = currentCart.map((item) =>
-      item.lineItemId === lineItemId 
-        ? { ...item, qty: Math.max(0, newQty), discount: discount !== undefined ? discount : item.discount } 
-        : item
-    ).filter(item => item.qty > 0);
+    const updatedCart = currentCart
+      .map((item) =>
+        item.lineItemId === lineItemId
+          ? {
+              ...item,
+              qty: Math.max(0, newQty),
+              discount: discount !== undefined ? discount : item.discount,
+            }
+          : item,
+      )
+      .filter((item) => item.qty > 0);
 
     set({
       carts: {
@@ -246,8 +266,14 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (!sourceItem) return;
 
     const areModifiersEqual = (mods1?: Modifier[], mods2?: Modifier[]) => {
-      const ids1 = (mods1 || []).map((m) => m.ModifierId).sort().join("|");
-      const ids2 = (mods2 || []).map((m) => m.ModifierId).sort().join("|");
+      const ids1 = (mods1 || [])
+        .map((m) => m.ModifierId)
+        .sort()
+        .join("|");
+      const ids2 = (mods2 || [])
+        .map((m) => m.ModifierId)
+        .sort()
+        .join("|");
       return ids1 === ids2;
     };
 
@@ -269,7 +295,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         p.salt === sourceItem.salt &&
         p.sugar === sourceItem.sugar &&
         p.note === sourceItem.note &&
-        areModifiersEqual(p.modifiers, modifiers)
+        areModifiersEqual(p.modifiers, modifiers),
     );
 
     let updatedCart = [...currentCart];
@@ -277,13 +303,15 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (sourceItem.qty > 1) {
       // Split the source item (drop 1 from group)
       updatedCart = updatedCart.map((i) =>
-        i.lineItemId === lineItemId ? { ...i, qty: i.qty - 1 } : i
+        i.lineItemId === lineItemId ? { ...i, qty: i.qty - 1 } : i,
       );
 
       if (matchingExistingItem) {
         // Merge the separated 1 qty into the matching existing item
         updatedCart = updatedCart.map((i) =>
-          i.lineItemId === matchingExistingItem.lineItemId ? { ...i, qty: i.qty + 1 } : i
+          i.lineItemId === matchingExistingItem.lineItemId
+            ? { ...i, qty: i.qty + 1 }
+            : i,
         );
       } else {
         // Create a new independent item for the 1 qty
@@ -301,15 +329,53 @@ export const useCartStore = create<CartState>((set, get) => ({
         // It matches another existing item! Merge them, delete the source line.
         updatedCart = updatedCart.filter((i) => i.lineItemId !== lineItemId);
         updatedCart = updatedCart.map((i) =>
-          i.lineItemId === matchingExistingItem.lineItemId ? { ...i, qty: i.qty + 1 } : i
+          i.lineItemId === matchingExistingItem.lineItemId
+            ? { ...i, qty: i.qty + 1 }
+            : i,
         );
       } else {
         // Just modify it in place
         updatedCart = updatedCart.map((i) =>
-          i.lineItemId === lineItemId ? { ...i, modifiers, price: newPrice } : i
+          i.lineItemId === lineItemId
+            ? { ...i, modifiers, price: newPrice }
+            : i,
         );
       }
     }
+
+    set({
+      carts: {
+        ...carts,
+        [currentContextId]: updatedCart,
+      },
+    });
+  },
+
+  updateCartItemTakeaway: (lineItemId, isTakeaway) => {
+    const { carts, currentContextId } = get();
+    if (!currentContextId) return;
+
+    const currentCart = carts[currentContextId] || [];
+    const updatedCart = currentCart.map((item) =>
+      item.lineItemId === lineItemId ? { ...item, isTakeaway } : item,
+    );
+
+    set({
+      carts: {
+        ...carts,
+        [currentContextId]: updatedCart,
+      },
+    });
+  },
+
+  updateCartItemDiscount: (lineItemId, discount) => {
+    const { carts, currentContextId } = get();
+    if (!currentContextId) return;
+
+    const currentCart = carts[currentContextId] || [];
+    const updatedCart = currentCart.map((item) =>
+      item.lineItemId === lineItemId ? { ...item, discount } : item,
+    );
 
     set({
       carts: {
