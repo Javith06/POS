@@ -37,7 +37,7 @@ const SOLID_LIGHT_GREEN = '#F0FDF4';
 const SOLID_LIGHT_RED   = '#FEF2F2';
 const SOLID_LIGHT_BLUE  = '#F0F9FF';
 const SOLID_LIGHT_AMBER = '#FFFBEB';
-const SOLID_LIGHT_ORANGE = '#FFF7ED';
+const SOLID_LIGHT_VIOLET = '#F5F3FF';
 
 // --- MEMOIZED TABLE COMPONENT ---
 const TableItemComponent = React.memo(({ 
@@ -86,11 +86,11 @@ const TableItemComponent = React.memo(({
         break;
       case "SENT":
         if (elapsedMinutes >= 60) {
-          bgColor = IS_MOBILE ? SOLID_LIGHT_ORANGE : Theme.tableSentOld.bg;
-          borderColor = Theme.tableSentOld.border;
-          textColor = "#B91C1C";
+          bgColor = IS_MOBILE ? SOLID_LIGHT_VIOLET : "#F5F3FF"; // Violet background
+          borderColor = "#7C3AED"; // Violet border
+          textColor = "#5B21B6"; // Violet text
           statusLabel = "OVERTIME";
-          statusColor = "#B91C1C";
+          statusColor = "#5B21B6";
         } else {
           bgColor = IS_MOBILE ? SOLID_LIGHT_GREEN : Theme.tableSent.bg;
           borderColor = Theme.tableSent.border;
@@ -549,7 +549,7 @@ export default function Category() {
                     color={isActive ? "#fff" : Theme.textSecondary}
                     style={{ marginRight: 5 }}
                   />
-                  <Text style={[styles.tabText, isActive && styles.activeTabText, { fontSize: isTablet ? 13 : 11 }]}>
+                  <Text style={[styles.tabText, isActive && styles.activeTabText, { fontSize: isTablet ? 16 : 13 }]}>
                     {SECTION_LABELS[section]}
                   </Text>
                   {occupied > 0 && (
@@ -576,7 +576,7 @@ export default function Category() {
             >
               <Ionicons
                 name="lock-closed-outline"
-                size={16}
+                size={20}
                 color={Theme.warning}
               />
               {isTablet && (
@@ -594,7 +594,7 @@ export default function Category() {
               onPress={() => router.push("/kds")}
               activeOpacity={0.75}
             >
-              <Ionicons name="tv-outline" size={16} color={Theme.info} />
+              <Ionicons name="tv-outline" size={20} color={Theme.info} />
               {isTablet && (
                 <Text style={[styles.headerActionText, { color: Theme.info }]}>
                   KDS
@@ -609,7 +609,7 @@ export default function Category() {
             onPress={() => setIsMenuVisible(true)}
             activeOpacity={0.75}
           >
-            <Ionicons name="menu-outline" size={20} color={Theme.primary} />
+            <Ionicons name="menu-outline" size={24} color={Theme.primary} />
             {isTablet && <Text style={[styles.headerActionText, { color: Theme.primary }]}>Menu</Text>}
           </TouchableOpacity>
         </View>
@@ -720,11 +720,11 @@ export default function Category() {
         {/* Legend */}
         <View style={styles.legend}>
           {[
-            { color: Theme.tableEmpty.border, label: "Free" },
             { color: Theme.tableSent.border, label: "Dining" },
             { color: Theme.tableHold.border, label: "Hold" },
             { color: Theme.tableBillRequest.border, label: "Checkout" },
             { color: Theme.tableLocked.border, label: "Reserved" },
+            { color: "#7C3AED", label: "Overtime" },
           ].map((item) => (
             <View key={item.label} style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: item.color }]} />
@@ -801,8 +801,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderRadius: Theme.radiusFull,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: Theme.bgMuted,
     borderWidth: 1,
     borderColor: Theme.border,
@@ -842,8 +842,8 @@ const styles = StyleSheet.create({
     backgroundColor: Theme.bgMuted,
     borderWidth: 1,
     borderColor: Theme.border,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   salesBtn: {
     backgroundColor: Theme.primaryLight,
@@ -855,8 +855,8 @@ const styles = StyleSheet.create({
   },
   headerActionText: {
     color: Theme.textSecondary,
-    fontFamily: Fonts.semiBold,
-    fontSize: 12,
+    fontFamily: Fonts.extraBold,
+    fontSize: 14,
   },
 
   /* ── Section Header Row ── */
