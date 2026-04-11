@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   UIManager,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { Fonts } from "../constants/Fonts";
@@ -40,6 +41,8 @@ interface CartSidebarProps {
 export default function CartSidebar({ width = 400 }: CartSidebarProps) {
   const router = useRouter();
   const { showToast } = useToast();
+  const { width: screenWidth } = useWindowDimensions();
+  const isPhone = screenWidth < 600;
 
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -402,14 +405,14 @@ export default function CartSidebar({ width = 400 }: CartSidebarProps) {
                 }}
               >
                 <Ionicons name="pause-circle-outline" size={20} color="#fff" />
-                <Text style={styles.btnText}>Hold Cart</Text>
+                {!isPhone && <Text style={styles.btnText}>Hold Cart</Text>}
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.proceedBtn, { backgroundColor: Theme.success }]}
                 onPress={() => handleSendOrder()}
               >
                 <Ionicons name="send" size={20} color="#fff" />
-                <Text style={styles.btnText}>Send</Text>
+                {!isPhone && <Text style={styles.btnText}>Send</Text>}
               </TouchableOpacity>
             </>
           ) : currentTableStatus === "SENT" ? (
