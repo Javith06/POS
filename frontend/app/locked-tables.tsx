@@ -41,13 +41,13 @@ const SECTION_LABELS: Record<string, string> = {
 };
 
 // --- MOBILE SOLID COLORS ---
-const IS_MOBILE = Platform.OS !== 'web';
 const SOLID_LIGHT_GREEN = '#F0FDF4'; 
 const SOLID_LIGHT_AMBER = '#FFFBEB';
 const SOLID_LIGHT_RED   = '#FEF2F2';
 
 export default function LockedTablesScreen() {
   const router = useRouter();
+  const IS_MOBILE = Platform.OS !== 'web';
   const [lockedTables, setLockedTables] = useState<TableType[]>([]);
   const [allTables, setAllTables] = useState<TableType[]>([]);
   const [activeSection, setActiveSection] = useState<string>("SECTION_1");
@@ -124,14 +124,44 @@ export default function LockedTablesScreen() {
     }
   };
 
-  const continueWithOrder = (tableNumber: string, diningSection?: number) => {
-    const section = getSectionFromDiningSection(diningSection);
-    setOrderContext({
-      orderType: "DINE_IN",
-      section: section,
-      tableNo: tableNumber,
-    });
-    router.push("/menu/thai_kitchen");
+  const continueWithOrder = async (tableId: string, tableNumber: string, diningSection?: number) => {
+    try {
+      // 1. Release the persistent lock in backend
+      const cleanId = String(tableId).replace(/^\{|\}$/g, "").trim();
+      await fetch(`${API_URL}/api/tables/unlock-persistent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tableId: cleanId }),
+      });
+
+      // 2. Mark table as Active/HOLD in the store to turn it green
+      const section = getSectionFromDiningSection(diningSection);
+      useTableStatusStore.getState().updateTableStatus(
+        section,
+        tableNumber,
+        `ORD-${Date.now().toString().slice(-6)}`, // Temporary ID
+        'HOLD',
+        Date.now()
+      );
+
+      // 3. Set context and navigate
+      setOrderContext({
+        orderType: "DINE_IN",
+        section: section,
+        tableNo: tableNumber,
+      });
+      router.push("/menu/thai_kitchen");
+    } catch (err) {
+      console.error("Failed to transition locked table:", err);
+      // Still attempt to navigate if API fails, as user wants to proceed
+      const section = getSectionFromDiningSection(diningSection);
+      setOrderContext({
+        orderType: "DINE_IN",
+        section: section,
+        tableNo: tableNumber,
+      });
+      router.push("/menu/thai_kitchen");
+    }
   };
 
   const lockTable = (tableId: string, tableNumber: string) => {
@@ -231,7 +261,7 @@ export default function LockedTablesScreen() {
             if (item.isLocked) {
               Alert.alert("Locked Table", `Table ${item.tableNumber} is locked. Continue order processing?`, [
                 { text: "Cancel", style: "cancel" },
-                { text: "Continue Order", onPress: () => continueWithOrder(item.tableNumber, item.diningSection) },
+                { text: "Continue Order", onPress: () => continueWithOrder(item.tableId, item.tableNumber, item.diningSection) },
               ]);
             } else if (isActive) {
               Alert.alert("Table In Use", `Table ${item.tableNumber} currently has an active order and cannot be locked.`);
@@ -460,16 +490,18 @@ const styles = StyleSheet.create({
   activeStatus: { color: Theme.success },
   unlockBtn: {
     position: "absolute", 
-    top: 5, 
-    right: 5, 
-    width: 28, 
-    height: 28, 
-    borderRadius: 8,
-    backgroundColor: Theme.danger + "15", 
+    top: -8, 
+    left: -8, 
+    width: 32, 
+    height: 32, 
+    borderRadius: 16,
+    backgroundColor: Theme.bgCard, 
     justifyContent: "center", 
     alignItems: "center", 
     borderWidth: 1, 
-    borderColor: Theme.danger + "30",
+    borderColor: Theme.danger + "40",
+    ...Theme.shadowMd,
+    zIndex: 10,
   },
   footer: {
     position: "absolute", bottom: 0, left: 0, right: 0, padding: 20,
@@ -489,6 +521,7 @@ const styles = StyleSheet.create({
   nameInput: {
     height: 60, backgroundColor: Theme.bgInput, borderRadius: 16, color: Theme.textPrimary,
     paddingHorizontal: 20, fontSize: 16, fontFamily: Fonts.bold, borderWidth: 1, borderColor: Theme.border, marginBottom: 25,
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
   },
   modalActions: { flexDirection: "row", gap: 15 },
   modalBtn: { flex: 1, height: 56, borderRadius: 16, justifyContent: "center", alignItems: "center", ...Theme.shadowMd },

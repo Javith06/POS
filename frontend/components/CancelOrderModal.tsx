@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   checkboxActive: { backgroundColor: Theme.danger, borderColor: Theme.danger },
   reasonText: { flex: 1, fontSize: 15, fontFamily: Fonts.bold, color: Theme.textSecondary },
   reasonTextActive: { color: Theme.textPrimary },
-  input: { backgroundColor: Theme.bgInput, borderRadius: 12, padding: 15, marginTop: 10, color: Theme.textPrimary, fontFamily: Fonts.bold, fontSize: 15, borderWidth: 1, borderColor: Theme.border, height: 100, textAlignVertical: "top" },
+  input: { backgroundColor: Theme.bgInput, borderRadius: 12, padding: 15, marginTop: 10, color: Theme.textPrimary, fontFamily: Fonts.bold, fontSize: 15, borderWidth: 1, borderColor: Theme.border, height: 100, textAlignVertical: "top", ...Platform.select({ web: { outlineStyle: "none" } as any }) },
   errorText: { color: Theme.danger, fontSize: 11, fontFamily: Fonts.bold, marginTop: 12, textAlign: "center" },
   footer: { flexDirection: "row", gap: 12, paddingHorizontal: 24, paddingVertical: 20, borderTopWidth: 1, borderTopColor: Theme.border },
   cancelBtn: { flex: 1, height: 56, borderRadius: 16, backgroundColor: Theme.bgMuted, justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: Theme.border },

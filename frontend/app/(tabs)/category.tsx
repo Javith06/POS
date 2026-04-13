@@ -32,7 +32,6 @@ import { useTableStatusStore } from "../../stores/tableStatusStore";
 import { useAuthStore } from "../../stores/authStore";
 
 // --- MOBILE SOLID COLORS ---
-const IS_MOBILE = Platform.OS !== 'web';
 const SOLID_LIGHT_GREEN = '#F0FDF4'; 
 const SOLID_LIGHT_RED   = '#FEF2F2';
 const SOLID_LIGHT_BLUE  = '#F0F9FF';
@@ -57,6 +56,7 @@ const TableItemComponent = React.memo(({
   numberFont: number;
   smallFont: number;
 }) => {
+  const IS_MOBILE = Platform.OS !== 'web';
   let borderColor = Theme.border;
   let bgColor = Theme.bgCard;
   let textColor = Theme.textPrimary;
@@ -224,21 +224,21 @@ export default function Category() {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const sectionScrollRef = useRef<ScrollView>(null);
 
-  const tables = useTableStatusStore((s) => s.tables);
-  const getLockedName = useTableStatusStore((s) => s.getLockedName);
-  const syncLockedTables = useTableStatusStore((s) => s.syncLockedTables);
-  const activeOrders = useActiveOrdersStore((s) => s.activeOrders);
-  const carts = useCartStore((s) => s.carts);
+  const tables = useTableStatusStore((s: any) => s.tables);
+  const getLockedName = useTableStatusStore((s: any) => s.getLockedName);
+  const syncLockedTables = useTableStatusStore((s: any) => s.syncLockedTables);
+  const activeOrders = useActiveOrdersStore((s: any) => s.activeOrders);
+  const carts = useCartStore((s: any) => s.carts);
 
   const isTablet = width >= 768;
 
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
-  const canAccessSalesReport = useAuthStore((s) => s.canAccessSalesReport);
-  const canAccessMembers     = useAuthStore((s) => s.canAccessMembers);
-  const canAccessTimeEntry   = useAuthStore((s) => s.canAccessTimeEntry);
-  const canAccessLockTables  = useAuthStore((s) => s.canAccessLockTables);
-  const canAccessKDS         = useAuthStore((s) => s.canAccessKDS);
+  const user = useAuthStore((s: any) => s.user);
+  const logout = useAuthStore((s: any) => s.logout);
+  const canAccessSalesReport = useAuthStore((s: any) => s.canAccessSalesReport);
+  const canAccessMembers     = useAuthStore((s: any) => s.canAccessMembers);
+  const canAccessTimeEntry   = useAuthStore((s: any) => s.canAccessTimeEntry);
+  const canAccessLockTables  = useAuthStore((s: any) => s.canAccessLockTables);
+  const canAccessKDS         = useAuthStore((s: any) => s.canAccessKDS);
 
   // ── Route guard: redirect to login if not authenticated ──
   useFocusEffect(
@@ -393,7 +393,7 @@ export default function Category() {
   });
 
   const occupiedCount = currentTables.filter((t) => {
-    const td = tables.find((st) => st.section === activeTab && st.tableNo === t.label);
+    const td = tables.find((st: any) => st.section === activeTab && st.tableNo === t.label);
     return !!td;
   }).length;
 
@@ -422,7 +422,7 @@ export default function Category() {
 
     if (tableData && tableData.status === "HOLD") {
       const helds = getHeldOrders();
-      const held = helds.find((h) => h.orderId === tableData.orderId);
+      const held = helds.find((h: any) => h.orderId === tableData.orderId);
       if (held) {
         const contextId = getContextId(newContext);
         if (contextId) setCartItemsGlobal(contextId, held.cart);
@@ -435,7 +435,7 @@ export default function Category() {
 
   const renderItem = React.useCallback(({ item }: { item: TableItem }) => {
     const rawTableData = tables.find(
-      (t) => t.section === activeTab && t.tableNo === item.label
+      (t: any) => t.section === activeTab && t.tableNo === item.label
     );
 
     // Prepare optimized data for memoized component
@@ -444,7 +444,7 @@ export default function Category() {
       let billAmount = 0;
       if (rawTableData.status === "HOLD") {
         const helds = getHeldOrders();
-        const held = helds.find((h) => h.orderId === rawTableData.orderId);
+        const held = helds.find((h: any) => h.orderId === rawTableData.orderId);
         if (held) {
           billAmount = held.cart.reduce(
             (sum: number, i: any) => sum + (i.price || 0) * i.qty,
@@ -533,7 +533,7 @@ export default function Category() {
                 return false;
               });
               const occupied = sectionTables.filter((t) =>
-                tables.some((st) => st.section === section && st.tableNo === t.label)
+                tables.some((st: any) => st.section === section && st.tableNo === t.label)
               ).length;
 
               return (

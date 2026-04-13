@@ -31,7 +31,12 @@ export default function DiscountModal({
   currentTotal: number;
 }) {
   const applyDiscount = useCartStore((s) => s.applyDiscount);
+  const clearDiscount = useCartStore((s) => s.clearDiscount);
+  const currentDiscounts = useCartStore((s) => s.discounts);
+  const currentContextId = useCartStore((s) => s.currentContextId);
   const updateOrderDiscount = useActiveOrdersStore((s) => s.updateOrderDiscount);
+
+  const hasAppliedDiscount = !!(currentContextId && currentDiscounts[currentContextId]?.applied);
 
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [inputValue, setInputValue] = useState("");
@@ -46,7 +51,7 @@ export default function DiscountModal({
     isFetchingRef.current = true;
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/api/discounts`);
+      const res = await fetch(`${API_URL}/api/admin/discounts`);
       const data = await res.json();
       if (Array.isArray(data)) setDbDiscounts(data);
     } catch (err) {
@@ -67,7 +72,7 @@ export default function DiscountModal({
     let value = 0;
 
     const pct = parseFloat(disc.DiscountPercentage) || 0;
-    const isGuest = parseInt(disc.isGuestMeal) === 1;
+    const isGuest = disc.isGuestMeal === true || parseInt(disc.isGuestMeal) === 1;
     const fixedAmt = parseFloat(disc.DiscountAmount) || 0;
 
     if (isGuest) {
@@ -147,6 +152,21 @@ export default function DiscountModal({
             <TouchableOpacity onPress={handleCancel} style={styles.closeBtn}><Ionicons name="close" size={24} color={Theme.textSecondary} /></TouchableOpacity>
           </View>
 
+          {hasAppliedDiscount && (
+            <TouchableOpacity 
+              style={styles.clearBadge} 
+              onPress={() => {
+                clearDiscount();
+                const currentContext = getOrderContext();
+                if (currentContext) updateOrderDiscount(currentContext, { applied: false, type: "fixed", value: 0 });
+                onClose();
+              }}
+            >
+              <Ionicons name="trash-outline" size={14} color={Theme.danger} />
+              <Text style={styles.clearBadgeText}>Remove Applied Discount</Text>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.segmentedControl}>
             <TouchableOpacity style={[styles.segmentBtn, discountType === "percentage" && styles.segmentActive]} onPress={() => { setDiscountType("percentage"); setInputValue(""); }}>
               <Text style={[styles.segmentText, discountType === "percentage" && styles.segmentTextActive]}>Percentage (%)</Text>
@@ -163,7 +183,7 @@ export default function DiscountModal({
                 {dbDiscounts.map((disc) => (
                   <TouchableOpacity key={disc.DiscountId} style={styles.discountCard} onPress={() => handleApplyDbDiscount(disc)}>
                     <Text style={styles.discountCardLabel}>
-                      {parseInt(disc.isGuestMeal) === 1
+                      {(disc.isGuestMeal === true || parseInt(disc.isGuestMeal) === 1)
                         ? "100%"
                         : parseFloat(disc.DiscountPercentage) > 0
                           ? `${parseFloat(disc.DiscountPercentage)}%`
@@ -232,7 +252,7 @@ const styles = StyleSheet.create({
   discountCardSmall: { color: Theme.textMuted, fontSize: 10, fontFamily: Fonts.bold, marginTop: 4 },
   inputWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: Theme.bgInput, borderWidth: 1, borderColor: Theme.border, borderRadius: 16, paddingHorizontal: 16, height: 60, marginBottom: 20 },
   inputPrefix: { color: Theme.textSecondary, fontSize: 20, fontFamily: Fonts.black, marginRight: 10 },
-  input: { flex: 1, color: Theme.textPrimary, fontSize: 22, fontFamily: Fonts.black },
+  input: { flex: 1, color: Theme.textPrimary, fontSize: 22, fontFamily: Fonts.black, ...Platform.select({ web: { outlineStyle: "none" } as any }) },
   previewContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: Theme.primary + "10", padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Theme.primary + "30", marginBottom: 20 },
   previewLabel: { color: Theme.primary, fontSize: 14, fontFamily: Fonts.black },
   previewValue: { color: Theme.primary, fontSize: 22, fontFamily: Fonts.black },
@@ -241,4 +261,22 @@ const styles = StyleSheet.create({
   cancelActionText: { color: Theme.textSecondary, fontSize: 16, fontFamily: Fonts.black },
   applyBtn: { flex: 2, backgroundColor: Theme.primary, height: 60, borderRadius: 16, justifyContent: "center", alignItems: "center", ...Theme.shadowMd },
   applyBtnText: { color: "#fff", fontSize: 16, fontFamily: Fonts.black },
+  clearBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Theme.danger + "10",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
+    marginBottom: 20,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: Theme.danger + "30",
+  },
+  clearBadgeText: {
+    color: Theme.danger,
+    fontSize: 12,
+    fontFamily: Fonts.black,
+  },
 });

@@ -218,6 +218,7 @@ const styles = StyleSheet.create({
     color: Theme.textPrimary,
     fontSize: 18,
     fontFamily: Fonts.black,
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
   },
   toggleBtn: {
     flexDirection: "row",

@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   StatusBar,
   Alert,
+  Platform,
 } from "react-native";
 import { useToast } from "@/components/Toast";
 import { API_URL } from "@/constants/Config";
@@ -413,6 +414,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.bold,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
   },
   inputActive: {
     borderColor: "#ea580c",

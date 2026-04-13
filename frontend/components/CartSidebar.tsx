@@ -787,6 +787,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     marginBottom: 20,
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
   },
   modalActions: { flexDirection: "row", justifyContent: "flex-end", gap: 10 },
   modalBtnCancel: { padding: 10 },

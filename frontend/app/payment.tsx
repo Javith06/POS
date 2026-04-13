@@ -191,7 +191,12 @@ export default function PaymentScreen() {
   /* ================= CALCULATIONS ================= */
 
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + (item.price || 0) * item.qty, 0),
+    () =>
+      cart.reduce((sum, item) => {
+        const isVoided = "status" in item && (item as any).status === "VOIDED";
+        if (isVoided) return sum;
+        return sum + (item.price || 0) * item.qty;
+      }, 0),
     [cart],
   );
 
@@ -229,7 +234,7 @@ export default function PaymentScreen() {
 
   const saveSaleToDatabase = async () => {
     try {
-      if (!activeOrder?.orderId || !/^#[A-Z0-9]{6}$/.test(activeOrder.orderId)) {
+      if (!activeOrder?.orderId || !/^\d{8}-\d{4}$/.test(activeOrder.orderId)) {
         showToast({ type: "error", message: "Invalid Order ID", subtitle: "Order ID format is invalid" });
         return false;
       }
@@ -239,12 +244,14 @@ export default function PaymentScreen() {
         orderType: context?.orderType === "DINE_IN" ? "DINE-IN" : context?.orderType || "DINE-IN",
         tableNo: context?.orderType === "TAKEAWAY" ? context?.takeawayNo : context?.tableNo,
         section: context?.section,
-        items: cart.map(item => ({
-          dishId: item.id,
-          name: item.name,
-          qty: item.qty,
-          price: item.price
-        })),
+        items: cart
+          .filter((item) => (item as any).status !== "VOIDED")
+          .map((item) => ({
+            dishId: item.id,
+            name: item.name,
+            qty: item.qty,
+            price: item.price,
+          })),
         subTotal: subtotal,
         taxAmount: tax,
         discountAmount: discountAmount,
@@ -407,13 +414,26 @@ export default function PaymentScreen() {
     }, 800);
   };
 
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={styles.itemRow}>
-      <Text style={styles.itemQty}>{item.qty}x</Text>
-      <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-      <Text style={styles.itemPrice}>${(item.price * item.qty).toFixed(2)}</Text>
-    </View>
-  );
+  const renderItem = ({ item }: { item: any }) => {
+    const isVoided = item.status === "VOIDED";
+    return (
+      <View style={styles.itemRow}>
+        <Text style={[styles.itemQty, isVoided && styles.textVoided]}>
+          {item.qty}x
+        </Text>
+        <Text
+          style={[styles.itemName, isVoided && styles.textVoided]}
+          numberOfLines={1}
+        >
+          {item.name}
+          {isVoided && " (VOIDED)"}
+        </Text>
+        <Text style={[styles.itemPrice, isVoided && styles.textVoided]}>
+          ${(item.price * item.qty).toFixed(2)}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -1040,8 +1060,8 @@ const styles = StyleSheet.create({
     height: "100%",
     ...Platform.select({
       web: {
-        outlineWidth: 0,
-      },
+        outlineStyle: "none",
+      } as any,
     }),
   },
 
@@ -1140,6 +1160,11 @@ const styles = StyleSheet.create({
   itemPrice: {
     color: Theme.textPrimary,
     fontFamily: Fonts.bold,
+  },
+  textVoided: {
+    textDecorationLine: "line-through",
+    color: Theme.textMuted,
+    opacity: 0.6,
   },
 
   receiptDivider: {

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
   StatusBar,
+  Platform,
 } from "react-native";
 import { Fonts } from "../constants/Fonts";
 import { Theme } from "../constants/theme";
@@ -183,8 +184,8 @@ const s = StyleSheet.create({
   presetTxt: { color: Theme.textSecondary, fontFamily: Fonts.black, fontSize: 13 },
   presetTxtActive: { color: Theme.primary },
   inputWrap: { flexDirection: "row", alignItems: "center", backgroundColor: Theme.bgInput, borderRadius: 14, borderWidth: 1, borderColor: Theme.border, paddingHorizontal: 16, height: 56, marginBottom: 10 },
-  input: { flex: 1, color: Theme.textPrimary, fontFamily: Fonts.black, fontSize: 18, paddingVertical: 12 },
-  inputFull: { backgroundColor: Theme.bgInput, borderWidth: 1, borderColor: Theme.border, borderRadius: 14, padding: 16, color: Theme.textPrimary, fontFamily: Fonts.bold, fontSize: 14 },
+  input: { flex: 1, color: Theme.textPrimary, fontFamily: Fonts.black, fontSize: 18, paddingVertical: 12, ...Platform.select({ web: { outlineStyle: "none" } as any }) },
+  inputFull: { backgroundColor: Theme.bgInput, borderWidth: 1, borderColor: Theme.border, borderRadius: 14, padding: 16, color: Theme.textPrimary, fontFamily: Fonts.bold, fontSize: 14, ...Platform.select({ web: { outlineStyle: "none" } as any }) },
   inputErr: { borderColor: Theme.danger },
   errTxt: { color: Theme.danger, fontSize: 11, fontFamily: Fonts.medium, marginTop: 6 },
   btns: { flexDirection: "row", gap: 12, marginTop: 24 },

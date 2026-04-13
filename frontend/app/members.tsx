@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     borderRadius: 16, backgroundColor: Theme.bgCard, borderWidth: 1, borderColor: Theme.border,
     ...Theme.shadowSm 
   },
-  searchField: { flex: 1, color: Theme.textPrimary, fontFamily: Fonts.medium, fontSize: 16, marginLeft: 12 },
+  searchField: { flex: 1, color: Theme.textPrimary, fontFamily: Fonts.medium, fontSize: 16, marginLeft: 12, ...Platform.select({ web: { outlineStyle: "none" } as any }) },
   listContainer: { paddingHorizontal: 20, paddingBottom: 40, gap: 16 },
   memberCard: { 
     backgroundColor: Theme.bgCard, borderRadius: 20, padding: 20, 
@@ -382,7 +382,8 @@ const styles = StyleSheet.create({
   inputLabel: { color: Theme.textMuted, fontSize: 10, fontFamily: Fonts.black, marginBottom: 8, letterSpacing: 0.5 },
   sheetInput: { 
     height: 56, backgroundColor: Theme.bgInput, borderRadius: 14, color: Theme.textPrimary, 
-    paddingHorizontal: 16, fontSize: 15, fontFamily: Fonts.bold, borderWidth: 1, borderColor: Theme.border 
+    paddingHorizontal: 16, fontSize: 15, fontFamily: Fonts.bold, borderWidth: 1, borderColor: Theme.border,
+    ...Platform.select({ web: { outlineStyle: "none" } as any })
   },
   submitBtn: { backgroundColor: Theme.primary, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 15, ...Theme.shadowMd },
   submitBtnText: { color: "#fff", fontFamily: Fonts.black, fontSize: 16 },

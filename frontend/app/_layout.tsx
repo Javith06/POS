@@ -39,6 +39,9 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
+      // Initialize order counter from backend
+      import("@/stores/orderIdStore").then((m) => m.initializeOrderCounter());
+      
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);

@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, height: 52,
   },
   inputIcon:   { marginRight: 10 },
-  input:       { flex: 1, color: Theme.textPrimary, fontSize: 16, fontFamily: Fonts.medium },
+  input:       { flex: 1, color: Theme.textPrimary, fontSize: 16, fontFamily: Fonts.medium, ...Platform.select({ web: { outlineStyle: "none" } as any }) },
   eyeBtn:      { padding: 4 },
 
   button: {

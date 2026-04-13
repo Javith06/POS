@@ -29,7 +29,7 @@ import {
 } from "../../stores/cartStore";
 import { useOrderContextStore } from "../../stores/orderContextStore";
 
-const IMAGE_BASE_URL = `${API_URL}/images/`;
+const IMAGE_BASE_URL = `${API_URL}/api/menu/image/`;
 
 // --- COMPONENTS ---
 
@@ -232,7 +232,7 @@ export default function MenuScreen() {
 
   useEffect(() => {
     setIsInitialLoading(true);
-    fetch(`${API_URL}/kitchens`)
+    fetch(`${API_URL}/api/menu/kitchens`)
       .then((res) => res.json())
       .then((data) => {
         const safeData = Array.isArray(data) ? data : [];
@@ -253,7 +253,7 @@ export default function MenuScreen() {
   const loadGroups = async (kitchenId: string) => {
     setSelectedKitchenId(kitchenId);
     try {
-      const res = await fetch(`${API_URL}/dishgroups/${kitchenId}`);
+      const res = await fetch(`${API_URL}/api/menu/dishgroups/${kitchenId}`);
       const data = await res.json();
       setGroups(Array.isArray(data) ? data : []);
       if (Array.isArray(data) && data.length > 0)
@@ -267,7 +267,7 @@ export default function MenuScreen() {
     setSelectedGroup(groupId);
     setIsLoadingDishes(true);
     try {
-      const res = await fetch(`${API_URL}/dishes/${groupId}`);
+      const res = await fetch(`${API_URL}/api/menu/dishes/group/${groupId}`);
       const data = await res.json();
       setItems(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -296,7 +296,7 @@ export default function MenuScreen() {
     setLoadingModifiers(true);
 
     try {
-      const res = await fetch(`${API_URL}/modifiers/${dish.DishId}`);
+      const res = await fetch(`${API_URL}/api/menu/modifiers/${dish.DishId}`);
       if (!res.ok) throw new Error("Failed to fetch modifiers");
       const data = await res.json();
 
@@ -1028,6 +1028,7 @@ const styles = StyleSheet.create({
     color: Theme.textPrimary,
     fontSize: 16,
     fontFamily: Fonts.medium,
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
   },
   customModalActions: { flexDirection: "row", gap: 12, marginTop: 10 },
   customBtnCancel: {

@@ -728,6 +728,7 @@ const styles = StyleSheet.create({
     borderColor: Theme.border,
     marginBottom: 20,
     fontFamily: Fonts.bold,
+    ...Platform.select({ web: { outlineStyle: "none" } as any }),
   },
   modalActions: {
     flexDirection: "row",

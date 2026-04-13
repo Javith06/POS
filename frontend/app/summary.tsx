@@ -145,12 +145,22 @@ export default function SummaryScreen() {
   };
 
   const totalItems = useMemo(
-    () => cart.reduce((sum, item) => sum + item.qty, 0),
+    () =>
+      cart.reduce((sum, item) => {
+        const isVoided = "status" in item && (item as any).status === "VOIDED";
+        if (isVoided) return sum;
+        return sum + item.qty;
+      }, 0),
     [cart],
   );
 
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + (item.price || 0) * item.qty, 0),
+    () =>
+      cart.reduce((sum, item) => {
+        const isVoided = "status" in item && (item as any).status === "VOIDED";
+        if (isVoided) return sum;
+        return sum + (item.price || 0) * item.qty;
+      }, 0),
     [cart],
   );
 
@@ -266,7 +276,16 @@ export default function SummaryScreen() {
                   </View>
 
                   <View style={styles.rowContent}>
-                    <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+                    <Text
+                      style={[
+                        styles.name,
+                        (item as any).status === "VOIDED" && styles.textVoided,
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {item.name}
+                      {(item as any).status === "VOIDED" && " (VOIDED)"}
+                    </Text>
                     {(item.spicy && item.spicy !== "Medium") ||
                     (item.oil && item.oil !== "Normal") ||
                     (item.salt && item.salt !== "Normal") ||
@@ -290,7 +309,14 @@ export default function SummaryScreen() {
                   </View>
 
                   <View style={styles.priceBlock}>
-                    <Text style={styles.price}>${((item.price || 0) * item.qty).toFixed(2)}</Text>
+                    <Text
+                      style={[
+                        styles.price,
+                        (item as any).status === "VOIDED" && styles.textVoided,
+                      ]}
+                    >
+                      ${((item.price || 0) * item.qty).toFixed(2)}
+                    </Text>
                   </View>
                 </View>
               )}
@@ -609,6 +635,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: Fonts.medium,
   },
+  textVoided: {
+    textDecorationLine: "line-through",
+    color: Theme.textMuted,
+    opacity: 0.7,
+  },
   priceBlock: {
     alignItems: "flex-end",
   },
@@ -817,6 +848,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Theme.border,
     fontFamily: Fonts.regular,
+    ...Platform.select({
+      web: {
+        outlineStyle: "none",
+      } as any,
+    }),
   },
   modalActions: {
     flexDirection: "row",
