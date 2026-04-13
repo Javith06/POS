@@ -114,49 +114,68 @@ router.get("/summary/:userId", async (req, res) => {
         ORDER BY CreatedOn ASC
       `);
 
-    let totalHours = 0;
-    let totalBreakMinutes = 0;
-    let clockInTime = null;
-    let clockOutTime = null;
+    let totalWorkMs = 0;
+    let totalBreakMs = 0;
+    let lastClockIn = null;
     let lastBreakIn = null;
     let isOnBreak = false;
     let hasClockIn = false;
+    let lastClockOutTime = null;
+    let firstClockInTime = null;
 
     for (const entry of entries.recordset) {
+      const entryTime = new Date(entry.ClockinTime).getTime();
+      
       if (entry.status === 1) {
         // IN
-        clockInTime = entry.ClockinTime;
+        lastClockIn = entryTime;
+        if (!firstClockInTime) firstClockInTime = entry.ClockinTime;
         hasClockIn = true;
         isOnBreak = false;
-      } else if (entry.status === 0 && clockInTime) {
+        lastClockOutTime = null;
+      } else if (entry.status === 0 && lastClockIn) {
         // OUT
-        clockOutTime = entry.ClockinTime;
-        totalHours = (clockOutTime - clockInTime) / (1000 * 60 * 60);
-      } else if (entry.status === 4) {
+        totalWorkMs += (entryTime - lastClockIn);
+        lastClockIn = null;
+        lastClockOutTime = entry.ClockinTime;
+      } else if (entry.status === 3) {
         // BREAK IN
-        lastBreakIn = entry.ClockinTime;
+        lastBreakIn = entryTime;
         isOnBreak = true;
-      } else if (entry.status === 3 && lastBreakIn) {
+      } else if (entry.status === 4 && lastBreakIn) {
         // BREAK OUT
-        const breakDuration = (entry.ClockinTime - lastBreakIn) / (1000 * 60);
-        totalBreakMinutes += breakDuration;
+        totalBreakMs += (entryTime - lastBreakIn);
         lastBreakIn = null;
         isOnBreak = false;
       }
     }
 
-    const netHours = totalHours - totalBreakMinutes / 60;
+    // If currently clocked in (no closing OUT entry for the last IN), 
+    // add elapsed time to totalWorkMs for real-time netHours calc
+    let activeWorkMs = totalWorkMs;
+    if (lastClockIn && !lastClockOutTime) {
+      activeWorkMs += (new Date().getTime() - lastClockIn);
+    }
+
+    const totalHoursResult = activeWorkMs / (1000 * 60 * 60);
+    const netHoursResult = (activeWorkMs - totalBreakMs) / (1000 * 60 * 60);
+    const lastStatusValue = entries.recordset.length > 0 ? entries.recordset[entries.recordset.length - 1].status : null;
 
     res.json({
       summary: {
-        clockedIn: hasClockIn && !clockOutTime,
-        shiftCompleted: hasClockIn && !!clockOutTime,
-        clockInTime: clockInTime ? clockInTime.toISOString() : null,
-        clockOutTime: clockOutTime ? clockOutTime.toISOString() : null,
-        totalHours: parseFloat(totalHours.toFixed(2)),
-        totalBreakMinutes: parseFloat(totalBreakMinutes.toFixed(0)),
-        netHours: parseFloat(netHours.toFixed(2)),
+        clockedIn: hasClockIn && !lastClockOutTime,
+        shiftCompleted: hasClockIn && !!lastClockOutTime,
+        lastStatus: lastStatusValue,
+        clockInTime: firstClockInTime ? new Date(firstClockInTime).toISOString() : null,
+        clockOutTime: lastClockOutTime ? new Date(lastClockOutTime).toISOString() : null,
+        totalHours: parseFloat(totalHoursResult.toFixed(2)),
+        totalBreakMinutes: Math.round(totalBreakMs / (1000 * 60)),
+        netHours: parseFloat(netHoursResult.toFixed(2)),
         isOnBreak: isOnBreak,
+        canClockIn: !hasClockIn || (lastStatusValue === 0), 
+        canClockOut: hasClockIn && !lastClockOutTime && !isOnBreak,
+        canStartBreak: hasClockIn && !lastClockOutTime && !isOnBreak,
+        canEndBreak: isOnBreak
       },
     });
   } catch (err) {
@@ -227,10 +246,10 @@ router.post("/save", async (req, res) => {
         hasClockIn = true;
       } else if (entry.status === 0) {
         hasClockOut = true;
-      } else if (entry.status === 4) {
+      } else if (entry.status === 3) {
         isOnBreak = true;
         lastBreakIn = entry.ClockinTime;
-      } else if (entry.status === 3 && isOnBreak) {
+      } else if (entry.status === 4 && isOnBreak) {
         isOnBreak = false;
         lastBreakIn = null;
       }
@@ -264,7 +283,7 @@ router.post("/save", async (req, res) => {
           message: "Cannot clock out while on break. Please end break first.",
         });
       }
-    } else if (status === 4) {
+    } else if (status === 3) {
       // BREAK IN
       if (!hasClockIn || hasClockOut) {
         return res
@@ -276,7 +295,7 @@ router.post("/save", async (req, res) => {
           .status(400)
           .json({ message: "Already on break. Please end break first." });
       }
-    } else if (status === 3) {
+    } else if (status === 4) {
       // BREAK OUT
       if (!isOnBreak) {
         return res
@@ -299,15 +318,8 @@ router.post("/save", async (req, res) => {
         (@UserId, @ClockTime, @Status, @BusinessUnitId, @CreatedBy, GETDATE(), @CreatedBy, GETDATE())
       `);
 
-    // No ClockoutTime column — skip that update
-    const actionName =
-      status === 1
-        ? "IN"
-        : status === 0
-          ? "OUT"
-          : status === 4
-            ? "BREAK IN"
-            : "BREAK OUT";
+    const actionNames = { 1: "IN", 0: "OUT", 3: "BREAK IN", 4: "BREAK OUT" };
+    const actionName = actionNames[status] || "ACTION";
 
     res.json({
       success: true,
@@ -413,8 +425,8 @@ router.get("/today/:userId", async (req, res) => {
           CASE 
             WHEN status = 1 THEN 'IN'
             WHEN status = 0 THEN 'OUT'
-            WHEN status = 4 THEN 'BREAK IN'
-            WHEN status = 3 THEN 'BREAK OUT'
+            WHEN status = 3 THEN 'BREAK IN'
+            WHEN status = 4 THEN 'BREAK OUT'
           END as ActionName
         FROM TimeEntry
         WHERE Userid = @UserId 
@@ -478,7 +490,7 @@ router.get("/status/:userId", async (req, res) => {
     if (lastEntry.status === 1) {
       currentStatus = "CLOCKED_IN";
       clockedIn = true;
-    } else if (lastEntry.status === 4) {
+    } else if (lastEntry.status === 3) {
       currentStatus = "ON_BREAK";
       clockedIn = true;
       onBreak = true;
