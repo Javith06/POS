@@ -1,298 +1,615 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { API_URL } from "@/constants/Config";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
-  SafeAreaView,
-  StatusBar,
-  Alert,
-  Platform,
 } from "react-native";
-import { useToast } from "@/components/Toast";
-import { API_URL } from "@/constants/Config";
-import { Fonts } from "@/constants/Fonts";
 
-type ActiveField = "user" | "pass" | "staff";
-type ShiftState = "UNCLOCKED" | "WORKING" | "ON_BREAK";
+interface TodaySummary {
+  clockedIn: boolean;
+  shiftCompleted: boolean;
+  clockInTime: string | null;
+  clockOutTime: string | null;
+  totalHours: number;
+  totalBreakMinutes: number;
+  netHours: number;
+  isOnBreak: boolean;
+}
 
-export default function TimeEntry() {
-  const router = useRouter();
-  const { width } = useWindowDimensions();
-  const { showToast } = useToast();
+export default function TimeEntryModal() {
+  const [userName, setUserName] = useState("");
+  const [password, setPassword] = useState("");
+  const [userId, setUserId] = useState("");
+  const [staffName, setStaffName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [todaySummary, setTodaySummary] = useState<TodaySummary | null>(null);
+  const [showSummary, setShowSummary] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [offlineEntries, setOfflineEntries] = useState<any[]>([]);
+  const [showOfflineBadge, setShowOfflineBadge] = useState(false);
 
-  const isTablet = width < 900;
-
-  const [userId, setUserId] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [staffName, setStaffName] = useState<string>("");
-  const [active, setActive] = useState<ActiveField>("user");
-  const [shiftState, setShiftState] = useState<ShiftState>("UNCLOCKED");
-
-  const [time, setTime] = useState<Date>(new Date());
-
+  // Real-time clock update
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const date = time.toLocaleDateString("en-GB", {
+  // Load saved credentials and offline entries
+  useEffect(() => {
+    loadSavedCredentials();
+    loadOfflineEntries();
+  }, []);
+
+  // Fetch summary when userId changes (including on mount from AsyncStorage)
+  useEffect(() => {
+    if (userId) {
+      fetchTodaySummary();
+    }
+  }, [userId]);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedUser = await AsyncStorage.getItem("lastUserName");
+      const savedUserId = await AsyncStorage.getItem("lastUserId");
+      if (savedUser) setUserName(savedUser);
+      if (savedUserId) {
+        setUserId(savedUserId);
+        // Also fetch the staff name for the saved user
+        try {
+          const res = await fetch(`${API_URL}/api/attendance/getUser`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userName: savedUser }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setStaffName(data.FullName || "");
+          }
+        } catch (_) {}
+      }
+    } catch (error) {
+      console.error("Error loading credentials:", error);
+    }
+  };
+
+  const saveCredentials = async (name: string, id: string) => {
+    try {
+      await AsyncStorage.setItem("lastUserName", name);
+      await AsyncStorage.setItem("lastUserId", id);
+    } catch (error) {
+      console.error("Error saving credentials:", error);
+    }
+  };
+
+  const loadOfflineEntries = async () => {
+    try {
+      const entries = await AsyncStorage.getItem("offlineEntries");
+      if (entries) {
+        const parsed = JSON.parse(entries);
+        setOfflineEntries(parsed);
+        setShowOfflineBadge(parsed.length > 0);
+      }
+    } catch (error) {
+      console.error("Error loading offline entries:", error);
+    }
+  };
+
+  const saveOfflineEntry = async (entry: any) => {
+    try {
+      const existing = await AsyncStorage.getItem("offlineEntries");
+      const entries = existing ? JSON.parse(existing) : [];
+      entries.push(entry);
+      await AsyncStorage.setItem("offlineEntries", JSON.stringify(entries));
+      setOfflineEntries(entries);
+      setShowOfflineBadge(true);
+    } catch (error) {
+      console.error("Error saving offline entry:", error);
+    }
+  };
+
+  const syncOfflineEntries = async () => {
+    if (offlineEntries.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/api/attendance/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: offlineEntries }),
+      });
+
+      const result = await response.json();
+
+      if (result.success && result.synced > 0) {
+        await AsyncStorage.removeItem("offlineEntries");
+        setOfflineEntries([]);
+        setShowOfflineBadge(false);
+        Alert.alert(
+          "Sync Complete",
+          `${result.synced} entries synced successfully`,
+        );
+        fetchTodaySummary();
+      }
+    } catch (error) {
+      console.error("Error syncing offline entries:", error);
+      Alert.alert("Sync Failed", "Please check your network connection");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchTodaySummary = async () => {
+    if (!userId) return;
+    try {
+      const url = `${API_URL}/api/attendance/summary/${userId}`;
+      console.log("Fetching summary:", url);
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log("Summary response:", JSON.stringify(data));
+      if (response.ok && data.summary) {
+        setTodaySummary(data.summary);
+      } else {
+        console.warn("Summary fetch failed:", data);
+      }
+    } catch (error) {
+      console.error("Error fetching summary:", error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTodaySummary();
+    setRefreshing(false);
+  };
+
+  const formattedDate = currentTime.toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
     month: "short",
     day: "numeric",
   });
-  const clock = time.toLocaleTimeString("en-GB", {
+
+  const formattedTime = currentTime.toLocaleTimeString("en-US", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
 
-  const keypad: string[] = [
-    "1", "2", "3", "Bksp",
-    "4", "5", "6", "Space",
-    "7", "8", "9", "Clear",
-    "0", "00", ".", "Ent",
-  ];
-
-  const getValue = (): string => {
-    if (active === "user") return userId;
-    if (active === "pass") return password;
-    return staffName;
-  };
-
-  const setValue = (val: string): void => {
-    if (active === "user") setUserId(val);
-    if (active === "pass") setPassword(val);
-    if (active === "staff") setStaffName(val);
-  };
-
-  const handleKeyPress = (key: string): void => {
-    let value = getValue();
-
-    if (key === "Bksp") {
-      setValue(value.slice(0, -1));
-      return;
+  const getUser = async (): Promise<string | null> => {
+    if (!userName.trim()) {
+      Alert.alert("Error", "Please enter User ID");
+      return null;
     }
 
-    if (key === "Clear") {
-      setValue("");
-      return;
-    }
-
-    if (key === "Space") {
-      setValue(value + " ");
-      return;
-    }
-
-    if (key === "Ent") {
-      Alert.alert("Select Action", "Please tap an action button below (IN, OUT, Break).");
-      return;
-    }
-
-    setValue(value + key);
-  };
-
-  const trackAction = async (
-    action: "START" | "BREAK_IN" | "BREAK_OUT" | "END",
-    nextState: ShiftState
-  ) => {
-    if (!userId.trim() || !password.trim() || !staffName.trim()) {
-      Alert.alert("⚠️ Missing Fields", "Please enter User ID, Password, and Name.", [{ text: "OK" }]);
-      return;
-    }
-
+    setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/attendance/track`, {
+      console.log("Calling API:", `${API_URL}/api/attendance/getUser`);
+
+      const res = await fetch(`${API_URL}/api/attendance/getUser`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          employeeId: userId,
-          employeeName: staffName,
-          action,
-          timestamp: new Date().toISOString(),
-          businessUnitId: "default",
-          userId: "current-user",
-        }),
+        body: JSON.stringify({ userName }),
       });
 
-      const result = await response.json();
-      if (result.success) {
-        showToast({ type: "success", message: `Shift ${action.replace('_', ' ')}` });
-        setShiftState(nextState);
+      const data = await res.json();
 
-        // If clocking out, reset the user interface entirely after a brief delay
-        if (action === "END") {
-          setTimeout(() => {
-            setUserId("");
-            setPassword("");
-            setStaffName("");
-            setActive("user");
-          }, 1500);
-        }
-      } else {
-        showToast({ type: "error", message: result.message || `Failed. Please try again.` });
+      if (!res.ok) {
+        throw new Error(data.message || "User not found");
       }
-    } catch (err) {
-      showToast({ type: "error", message: `Connection Error.` });
+
+      setUserId(data.UserId);
+      setStaffName(data.FullName);
+      await saveCredentials(userName, data.UserId);
+      // Force summary refresh after successful user lookup
+      fetchTodaySummary();
+      return data.UserId;
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "User not found");
+      setStaffName("");
+      setUserId("");
+      return null;
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const validatePassword = async () => {
+    if (!password) {
+      Alert.alert("Error", "Please enter Password");
+      return false;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/validatePassword`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userName, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Invalid password");
+      }
+
+      return true;
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Invalid credentials");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAction = async (status: number) => {
+    const actionName =
+      status === 1
+        ? "IN"
+        : status === 0
+          ? "OUT"
+          : status === 4
+            ? "BREAK IN"
+            : "BREAK OUT";
+
+    if (!userName.trim()) {
+      Alert.alert("Error", "Please enter User ID");
+      return;
+    }
+
+    // Resolve userId — use state or fetch fresh
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const fetchedId = await getUser();
+      if (!fetchedId) return;
+      resolvedUserId = fetchedId;
+    }
+
+    const passwordValid = await validatePassword();
+    if (!passwordValid) return;
+
+    setIsLoading(true);
+
+    const entryData = {
+      userId: resolvedUserId,  // Use resolved ID, not stale state
+      status,
+      userName,
+      password,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      const res = await fetch(`${API_URL}/api/attendance/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(entryData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to save");
+      }
+
+      Alert.alert(
+        "Success",
+        `${actionName} recorded successfully at ${formattedTime}`,
+      );
+
+      await fetchTodaySummary();
+
+      if (status === 0) {
+        setUserName("");
+        setPassword("");
+        setStaffName("");
+        setUserId("");
+      } else {
+        setPassword("");
+      }
+    } catch (error: any) {
+      if (
+        error.message.includes("Network") ||
+        error.message.includes("fetch")
+      ) {
+        await saveOfflineEntry(entryData);
+        Alert.alert(
+          "Offline Mode",
+          `Action saved offline. Will sync when network returns.\n\nAction: ${actionName}\nTime: ${formattedTime}`,
+        );
+      } else {
+        Alert.alert("Error", error.message || "Failed to record attendance");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getButtonStyle = (status: number) => {
+    // If shift is complete, all buttons faded
+    if (todaySummary?.shiftCompleted) {
+      return [status === 1 || status === 4 ? styles.btnGreen : styles.btnRed, styles.buttonDisabled];
+    }
+
+    let baseStyle = status === 1 || status === 4 ? styles.btnGreen : styles.btnRed;
+    if (isLoading) return [baseStyle, styles.buttonDisabled];
+
+    if (status === 0 && (!todaySummary || !todaySummary.clockedIn)) {
+      return [baseStyle, styles.buttonDisabled];
+    }
+    if (status === 4 && (!todaySummary || !todaySummary.clockedIn || todaySummary.isOnBreak)) {
+      return [baseStyle, styles.buttonDisabled];
+    }
+    if (status === 3 && (!todaySummary || !todaySummary.isOnBreak)) {
+      return [baseStyle, styles.buttonDisabled];
+    }
+    if (status === 1 && todaySummary && (todaySummary.clockedIn || todaySummary.shiftCompleted)) {
+      return [baseStyle, styles.buttonDisabled];
+    }
+    return baseStyle;
+  };
+
+  const isButtonDisabled = (status: number) => {
+    if (isLoading) return true;
+    // All buttons disabled if shift is fully completed today
+    if (todaySummary?.shiftCompleted) return true;
+
+    if (status === 0 && (!todaySummary || !todaySummary.clockedIn)) return true;
+    if (status === 4 && (!todaySummary || !todaySummary.clockedIn || todaySummary.isOnBreak)) return true;
+    if (status === 3 && (!todaySummary || !todaySummary.isOnBreak)) return true;
+    if (status === 1 && todaySummary && (todaySummary.clockedIn || todaySummary.shiftCompleted)) return true;
+
+    return false;
+  };
+
+  const getButtonText = (status: number) => {
+    return status === 1
+      ? "IN"
+      : status === 0
+        ? "OUT"
+        : status === 4
+          ? "BREAK IN"
+          : "BREAK OUT";
+  };
+
+  const SummaryModal = () => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={showSummary}
+      onRequestClose={() => setShowSummary(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Today's Summary</Text>
+
+          {todaySummary ? (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Status:</Text>
+                <Text
+                  style={[
+                    styles.summaryValue,
+                    todaySummary.clockedIn && styles.statusActive,
+                  ]}
+                >
+                  {todaySummary.clockedIn
+                    ? todaySummary.isOnBreak
+                      ? "On Break"
+                      : "Working"
+                    : "Not Clocked In"}
+                </Text>
+              </View>
+
+              {todaySummary.clockInTime && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Clock In:</Text>
+                  <Text style={styles.summaryValue}>
+                    {new Date(todaySummary.clockInTime).toLocaleTimeString()}
+                  </Text>
+                </View>
+              )}
+
+              {todaySummary.clockOutTime && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Clock Out:</Text>
+                  <Text style={styles.summaryValue}>
+                    {new Date(todaySummary.clockOutTime).toLocaleTimeString()}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total Hours:</Text>
+                <Text style={styles.summaryValue}>
+                  {todaySummary.totalHours.toFixed(2)} hrs
+                </Text>
+              </View>
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Break Time:</Text>
+                <Text style={styles.summaryValue}>
+                  {String(todaySummary.totalBreakMinutes)} mins
+                </Text>
+              </View>
+
+              <View style={styles.summaryDivider} />
+
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabelNet}>Net Hours:</Text>
+                <Text style={styles.summaryValueNet}>
+                  {todaySummary.netHours.toFixed(2)} hrs
+                </Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.noDataText}>No data for today</Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.modalCloseBtn}
+            onPress={() => setShowSummary(false)}
+          >
+            <Text style={styles.modalCloseText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.background}>
-        
-        {/* HEADER */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color="#1e293b" />
-          </TouchableOpacity>
-
-          <Text style={styles.title}>
-            SMART <Text style={{ color: "#ea580c" }}>Café</Text>
-          </Text>
-
-          <View style={styles.timeWrap}>
-            <Ionicons name="time-outline" size={18} color="#ea580c" />
-            <Text style={styles.timeText}>
-              {date} · {clock}
-            </Text>
-          </View>
-        </View>
-
-        {/* CONTENT */}
-        <View
-          style={[
-            styles.content,
-            { flexDirection: isTablet ? "column" : "row" },
-          ]}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
-          {/* LOGIN FORM CARD */}
-          <View style={[styles.card, styles.formBox]}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="person-circle" size={24} color="#ea580c" />
-              <Text style={styles.cardTitle}>Staff Gateway</Text>
-            </View>
+          {/* Offline Badge */}
+          {offlineEntries.length > 0 && (
+            <TouchableOpacity
+              style={styles.offlineBadge}
+              onPress={syncOfflineEntries}
+            >
+              <Text style={styles.offlineBadgeText}>
+                {offlineEntries.length} pending sync - Tap to sync
+              </Text>
+            </TouchableOpacity>
+          )}
 
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>
+              Time <Text style={styles.titleSpan}>Entry</Text>
+            </Text>
+            <View style={styles.dateTimeContainer}>
+              <Text style={styles.dateText}>{formattedDate}</Text>
+              <Text style={styles.timeText}>{formattedTime}</Text>
+            </View>
+          </View>
+
+          {/* Form */}
+          <View style={styles.form}>
             <View style={styles.inputGroup}>
               <Text style={styles.label}>User ID</Text>
               <TextInput
-                style={[styles.input, active === "user" && styles.inputActive]}
-                value={userId}
-                onChangeText={setUserId}
-                onFocus={() => setActive("user")}
-                placeholder="Enter ID"
-                placeholderTextColor="#94a3b8"
-                editable={false}
+                style={styles.input}
+                value={userName}
+                onChangeText={(text) => {
+                  setUserName(text);
+                  // Reset all user-specific state when ID changes
+                  setUserId("");
+                  setStaffName("");
+                  setPassword("");
+                  setTodaySummary(null);
+                }}
+                onBlur={getUser}
+                placeholder="Enter User ID"
+                placeholderTextColor="#999"
+                autoCapitalize="none"
+                editable={!isLoading}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Password</Text>
               <TextInput
-                style={[styles.input, active === "pass" && styles.inputActive]}
-                secureTextEntry
+                style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                onFocus={() => setActive("pass")}
-                placeholder="Enter password"
-                placeholderTextColor="#94a3b8"
-                editable={false}
+                placeholder="Enter Password"
+                placeholderTextColor="#999"
+                secureTextEntry
+                autoCapitalize="none"
+                editable={!isLoading}
               />
             </View>
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Staff Name</Text>
               <TextInput
-                style={[styles.input, active === "staff" && styles.inputActive]}
+                style={[styles.input, styles.inputReadOnly]}
                 value={staffName}
-                onChangeText={setStaffName}
-                onFocus={() => setActive("staff")}
-                placeholder="Enter name"
-                placeholderTextColor="#94a3b8"
+                placeholder="Staff Name"
+                placeholderTextColor="#999"
                 editable={false}
               />
             </View>
+          </View>
 
-            <View style={styles.actionDivider} />
+          {/* Today's Summary Button */}
+          {userId.length > 0 && (
+            <TouchableOpacity
+              style={styles.summaryBtn}
+              onPress={() => setShowSummary(true)}
+            >
+              <Text style={styles.summaryBtnText}>View Today's Summary</Text>
+            </TouchableOpacity>
+          )}
 
-            {/* ACTION BUTTONS */}
-            <View style={styles.buttonsWrap}>
-              {shiftState === "UNCLOCKED" && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.btnIn]}
-                  onPress={() => trackAction("START", "WORKING")}
-                >
-                  <Ionicons name="log-in" size={22} color="#fff" />
-                  <Text style={styles.btnText}>CLOCK IN</Text>
-                </TouchableOpacity>
-              )}
+          {/* Shift Completed Banner */}
+          {todaySummary?.shiftCompleted === true && (
+            <View style={styles.shiftDoneBanner}>
+              <Text style={styles.shiftDoneText}>✅ Shift completed for today</Text>
+              <Text style={styles.shiftDoneSub}>
+                {todaySummary.totalHours.toFixed(2)} hrs worked
+              </Text>
+            </View>
+          )}
 
-              {shiftState === "WORKING" && (
-                <View style={styles.rowBtns}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.rowActionBtn, styles.btnBreakIn]}
-                    onPress={() => trackAction("BREAK_IN", "ON_BREAK")}
-                  >
-                    <Ionicons name="cafe" size={22} color="#fff" />
-                    <Text style={styles.btnText}>START BREAK</Text>
-                  </TouchableOpacity>
+          {/* Buttons Grid */}
+          <View style={styles.buttonGrid}>
+            {[1, 0, 4, 3].map((status) => (
+              <TouchableOpacity
+                key={status}
+                style={[styles.button, getButtonStyle(status)]}
+                onPress={() => handleAction(status)}
+                disabled={isButtonDisabled(status)}
+              >
+                <Text style={styles.buttonText}>{getButtonText(status)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.rowActionBtn, styles.btnOut]}
-                    onPress={() => trackAction("END", "UNCLOCKED")}
-                  >
-                    <Ionicons name="log-out" size={22} color="#fff" />
-                    <Text style={styles.btnText}>CLOCK OUT</Text>
-                  </TouchableOpacity>
+          {/* Status Indicator */}
+          {staffName.length > 0 && todaySummary !== null && (
+            <View style={styles.statusBar}>
+              <Text style={styles.statusText}>Welcome, {staffName}</Text>
+              {todaySummary.isOnBreak === true && (
+                <View style={styles.breakBadge}>
+                  <Text style={styles.breakBadgeText}>ON BREAK</Text>
                 </View>
               )}
-
-              {shiftState === "ON_BREAK" && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, styles.btnBreakOut]}
-                  onPress={() => trackAction("BREAK_OUT", "WORKING")}
-                >
-                  <Ionicons name="play" size={22} color="#fff" />
-                  <Text style={styles.btnText}>END BREAK</Text>
-                </TouchableOpacity>
-              )}
             </View>
-          </View>
+          )}
 
-          {/* KEYPAD CARD */}
-          <View style={[styles.card, styles.keypadBox]}>
-            <View style={styles.keypad}>
-              {keypad.map((k) => (
-                <TouchableOpacity
-                  key={k}
-                  style={[
-                    styles.key,
-                    k === "Ent" && styles.keyEnter,
-                    (k === "Bksp" || k === "Clear") && styles.keyDanger,
-                  ]}
-                  onPress={() => handleKeyPress(k)}
-                >
-                  <Text
-                    style={[
-                      styles.keyText,
-                      k === "Ent" && styles.keyTextLight,
-                      (k === "Bksp" || k === "Clear") && styles.keyTextDanger,
-                    ]}
-                  >
-                    {k}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Loading Indicator */}
+          {isLoading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color="#4CAF50" />
+              <Text style={styles.loadingText}>Processing...</Text>
             </View>
-          </View>
-        </View>
-      </View>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <SummaryModal />
     </SafeAreaView>
   );
 }
@@ -300,212 +617,273 @@ export default function TimeEntry() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#f5f5f5",
   },
-  background: {
+  container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+  },
+  scrollContent: {
+    flexGrow: 1,
     padding: 20,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  offlineBadge: {
+    backgroundColor: "#ff9800",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  },
+  offlineBadgeText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  header: {
+    alignItems: "center",
     marginBottom: 30,
+    paddingVertical: 20,
     backgroundColor: "#fff",
-    borderRadius: 16,
+    borderRadius: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#f1f5f9",
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#f1f5f9",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: Fonts.black,
-    color: "#1e293b",
-  },
-  timeWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#fff7ed",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ffedd5",
-  },
-  timeText: {
-    color: "#ea580c",
-    fontFamily: Fonts.bold,
-    fontSize: 14,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 25,
-    width: "100%",
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 24,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.06,
-    shadowRadius: 20,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: "#f1f5f9",
-  },
-  formBox: {
-    width: "100%",
-    maxWidth: 420,
-  },
-  keypadBox: {
-    width: "100%",
-    maxWidth: 380,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-    paddingBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontFamily: Fonts.black,
-    color: "#1e293b",
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    color: "#64748b",
-    marginBottom: 6,
-    fontSize: 12,
-    fontFamily: Fonts.bold,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 14,
-    padding: 16,
-    color: "#1e293b",
-    fontSize: 16,
-    fontFamily: Fonts.bold,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    ...Platform.select({ web: { outlineStyle: "none" } as any }),
-  },
-  inputActive: {
-    borderColor: "#ea580c",
-    backgroundColor: "#fff7ed",
-  },
-  actionDivider: {
-    height: 1,
-    backgroundColor: "#ffedd5",
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  buttonsWrap: {
-    width: "100%",
-  },
-  rowBtns: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 15,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-    height: 60,
-    borderRadius: 16,
-    shadowColor: "#ea580c",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 3,
   },
-  rowActionBtn: {
-    flex: 1,
+  title: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#333",
   },
-  btnText: {
-    color: "#fff",
-    fontFamily: Fonts.black,
+  titleSpan: {
+    color: "#4CAF50",
+  },
+  dateTimeContainer: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  dateText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 4,
+  },
+  timeText: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#4CAF50",
+  },
+  form: {
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  inputGroup: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 5,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    padding: 12,
     fontSize: 16,
-    letterSpacing: 0.5,
+    backgroundColor: "#fff",
   },
-  btnIn: {
-    backgroundColor: "#ea580c", // Primary Orange
+  inputReadOnly: {
+    backgroundColor: "#f9f9f9",
+    color: "#666",
   },
-  btnBreakIn: {
-    backgroundColor: "#fb923c", // Lighter Orange for Break
+  summaryBtn: {
+    backgroundColor: "#2196F3",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 20,
   },
-  btnBreakOut: {
-    backgroundColor: "#ea580c", // Primary Orange
+  summaryBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
-  btnOut: {
-    backgroundColor: "#9a3412", // Dark Orange/Brown for Out
-  },
-  keypad: {
+  buttonGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    gap: 12,
+    marginBottom: 20,
   },
-  key: {
-    width: "22%",
-    aspectRatio: 1,
-    borderRadius: 14,
-    backgroundColor: "#f8fafc",
+  button: {
+    width: "48%",
+    padding: 15,
+    borderRadius: 10,
     alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    marginBottom: 15,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  keyEnter: {
-    backgroundColor: "#ea580c",
-    borderColor: "#ea580c",
-    shadowColor: "#ea580c",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+  btnGreen: {
+    backgroundColor: "#4CAF50",
   },
-  keyDanger: {
-    backgroundColor: "#fef2f2",
-    borderColor: "#fecaca",
+  btnRed: {
+    backgroundColor: "#f44336",
   },
-  keyText: {
-    color: "#1e293b",
-    fontFamily: Fonts.black,
-    fontSize: 18,
+  buttonDisabled: {
+    opacity: 0.5,
   },
-  keyTextLight: {
+  buttonText: {
     color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
   },
-  keyTextDanger: {
-    color: "#ef4444",
+  statusBar: {
+    backgroundColor: "#e8f5e9",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  statusText: {
+    color: "#4CAF50",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  breakBadge: {
+    marginTop: 8,
+    backgroundColor: "#ff9800",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  breakBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  shiftDoneBanner: {
+    backgroundColor: "#e8f5e9",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  shiftDoneText: {
+    color: "#2e7d32",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  shiftDoneSub: {
+    color: "#4CAF50",
+    fontSize: 13,
+    marginTop: 4,
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 15,
+  },
+  loadingText: {
+    color: "#fff",
+    marginTop: 10,
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20,
+    width: "85%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  summaryValue: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "600",
+  },
+  summaryLabelNet: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "bold",
+  },
+  summaryValueNet: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "bold",
+  },
+  statusActive: {
+    color: "#4CAF50",
+    fontWeight: "bold",
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: "#ddd",
+    marginVertical: 10,
+  },
+  noDataText: {
+    textAlign: "center",
+    color: "#999",
+    fontSize: 14,
+    paddingVertical: 20,
+  },
+  modalCloseBtn: {
+    backgroundColor: "#2196F3",
+    padding: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    marginTop: 20,
+  },
+  modalCloseText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
